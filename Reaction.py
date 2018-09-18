@@ -99,7 +99,10 @@ class MetabolicReaction(Reaction):
         self.population = population
         self.stoichiometry_vector = np.zeros(len(chems_list))
         for reagent, stoichiometry in self.reagents.items():
-            self.stoichiometry_vector[chems_list.index(reagent.name)] = stoichiometry
+            # if the reaction involves a reagent which is purposefully not
+            # included in the simulation (eg: water), ignore it
+            if reagent in chems_list:
+                self.stoichiometry_vector[chems_list.index(reagent.name)] = stoichiometry
 
     def lnQ(self, C):
         '''Natural logarithm of the mass action ratio of the reaction.
