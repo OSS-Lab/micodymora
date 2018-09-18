@@ -1,0 +1,33 @@
+"name","formula","dGf0","source"
+H2O,H2O,-238.7,Noor et al. 2013
+H+,H+,0,Noor et al. 2013
+HO-,HO-,-157.293,Wagman et al. 1968
+H2(aq),H2,17.6,Noor et al. 2013
+H2(g),H2,0,Noor et al. 2013
+O2(g),O2,0,Noor et al. 2013
+O2(aq),O2,16.4,Noor et al. 2013
+NH3(aq),NH3,-26.57,Lange's handbook of chemistry
+NH3(g),NH3,-16.4,Lange's handbook of chemistry
+NH4+,NH4+,-79.4,Kleerebezem and van Loosdrecht 2010
+NO2-,NO2-,-32.2,Kleerebezem and van Loosdrecht 2010
+NO3-,NO3-,-111.3,Kleerebezem and van Loosdrecht 2010
+CH4(aq),CH4,-34.4,Wagman et al. 1982
+CH4(g),CH4,-50.75,Wagman et al. 1968
+CO2(aq),CO2,-386.0,Noor et al. 2013
+CO2(g),CO2,-394.4,Noor et al. 2013
+HCO3-,HCO3-,-546.3,Noor et al. 2013
+CO3-2,CO3-2,-527.9,Wagman et al. 1968
+SO4-2,SO4-2,-744.6,Heijnen et al. 2010
+H2S(aq),H2S,-27.87,Wagman et al. 1968
+H2S(g),HS2,-33.56,Wagman et al. 1968
+HS-,HS-,12.1,Kleerebezem and van Loosdrecht 2010
+H3PO4,H3PO4,-1143.5,Noor et al. 2013
+H2PO4-,H2PO4-,-1133.3,Noor et al. 2013
+HPO4-2,HPO4-2,-1093.6,Noor et al. 2013
+PO4-3,PO4-3,-1020.0,Noor et al. 2013
+Na+,Na+,0,Guess
+Lac(-),C3H5O3-,-511.3,Noor et al. 2013
+Lac,C3H6O3,-532.9,Noor et al. 2013
+Ac(-),C2H3O2-,-367.9,Noor et al. 2013
+Ac,C2H4O2,-393.8,Noor et al. 2013
+Biomass(Hoover),C5H7O2N,18.8,Roden and Jin 2011

@@ -1,0 +1,6 @@
+acetogenesis: Lac(-) + 2H2O --> Ac(-) + 2H2(aq) + HCO3- + H+
+sulfatotrophic acetogenesis: 2Lac(-) + SO4-2 --> 2Ac(-) + 2HCO3- + H2S(aq)
+sulfatotrophic H2 oxidation: 4H2(aq) + SO4-2 + 2H+ --> H2S(aq) + 4H2O
+hydrogenotrophic methanogenesis: HCO3- + 4H2(aq) + H+ --> CH4(aq) + 3H2O
+acetoclastic methanogenesis: Ac(-) + H+ --> CH4(aq) + CO2(aq)
+hybrid methanogenesis: Ac(-) + 4H2(aq) + H+ --> 2CH4(aq) + 2H2O
