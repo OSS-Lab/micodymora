@@ -10,6 +10,7 @@ from Nesting import aggregate
 from Chem import load_chems_dict
 from Reaction import Reaction, MetabolicReaction, load_reactions_dict
 from Equilibrium import SystemEquilibrator, load_equilibria_dict
+from GLT import load_glt_dict, SimulationGasLiquidTransfer, SystemGasLiquidTransfers
 from Rate import rates_dict
 from Community import Community, Population
 from Enzyme_allocation import enzyme_allocations_dict
@@ -19,6 +20,7 @@ from Simulation import Simulation
 default_chems_description_path = "data/chems.csv"
 default_reactions_description_path = "data/reactions.dat"
 default_equilibria_description_path = "data/equilibria.dat"
+default_glt_description_path = "data/gas_liquid_transfer.dat"
 
 class OverlappingEquilibriaException(Exception):
     '''When the system's equilibria are defined, a single chemical species
@@ -26,7 +28,7 @@ class OverlappingEquilibriaException(Exception):
     pass
 
 # TODO: add an option to ignore species, for example water
-def inventory_chems(chems_dict, reactions, equilibria, initial_concentrations, nevermind=["H2O"]):
+def inventory_chems(chems_dict, reactions, equilibria, glts, initial_concentrations, nevermind=["H2O"]):
     '''Inventories the chemical species needed in a simulation,
     create the population-specific biomass chems,
     set the the order of the chems in the concentration vector,
@@ -38,6 +40,7 @@ def inventory_chems(chems_dict, reactions, equilibria, initial_concentrations, n
     * chems_dict: dictionary of Chem instances ({chem_name: Chem}) to be used
     * reactions: list of Reaction instances representing all the catabolic reactions
     * equilibria: list of Equilibrium instances representing the equilibria to consider
+    * glts: list of GasLiquidTransfer instances
     * initial concentration: dictionary ({Chem: concentration}) assigning initial
             concentrations (it does not have to be exhaustive)
     * nevermind: list of names of chemical species to ignore during the simulation
@@ -51,6 +54,15 @@ def inventory_chems(chems_dict, reactions, equilibria, initial_concentrations, n
             elif chem.name not in nevermind:
                 chems_list.append(chem.name)
         nesting.append(nesting[-1] + len(equilibrium.chems))
+    for glt in glts:
+        liquid = glt.liquid_chem.name
+        gas = glt.gas_chem.name
+        if liquid not in chems_list and liquid not in nevermind:
+            chems_list.append(liquid)
+            nesting.append(nesting[-1] + 1)
+        if gas not in chems_list and gas not in nevermind:
+            chems_list.append(gas)
+            nesting.append(nesting[-1] + 1)
     for reaction in reactions:
         for chem in reaction.reagents:
             if chem.name not in chems_list and chem.name not in nevermind:
@@ -92,11 +104,13 @@ def outline_systems_chemistry(input_file):
     chems_description_path = input_file.get("chems_description_path", default_chems_description_path)
     reactions_description_path = input_file.get("reactions_description_path", default_reactions_description_path)
     equilibria_description_path = input_file.get("equilibria_description_path", default_equilibria_description_path)
+    glt_description_path = input_file.get("glt_description_path", default_glt_description_path)
     
     # load the chems and reactions dict
     chems_dict = load_chems_dict(chems_description_path)
     reactions_dict = load_reactions_dict(chems_description_path, reactions_description_path)
     equilibria_dict = load_equilibria_dict(chems_description_path, equilibria_description_path)
+    glt_dict = load_glt_dict(chems_description_path, glt_description_path)
  
     # look for concentration settings, catabolisms and equilibria to find which
     # chemical species should be simulated
@@ -104,6 +118,14 @@ def outline_systems_chemistry(input_file):
     equilibria = [equilibria_dict[equilibrium_name]
                   for equilibrium_name
                   in (input_file.get("equilibria") or [])]
+
+    gl_info = input_file.get("gas-liquid interface")
+    if gl_info:
+        glts = [glt_dict[glt]
+                for glt
+                in gl_info.get("transfers", [])]
+    else:
+        glts = []
  
     catabolisms = set()
     biomasses = dict()
@@ -112,10 +134,10 @@ def outline_systems_chemistry(input_file):
         for catabolism in population_info["pathways"]:
             catabolisms.add(reactions_dict[catabolism])
  
-    chems_list, nesting = inventory_chems(chems_dict, list(catabolisms), equilibria, concentration_settings)
+    chems_list, nesting = inventory_chems(chems_dict, list(catabolisms), equilibria, glts, concentration_settings)
     chems_dict, chems_list, nesting = record_biomasses(chems_dict, chems_list, nesting, biomasses)
  
-    return chems_list, nesting, equilibria, reactions_dict, chems_dict
+    return chems_list, nesting, equilibria, reactions_dict, chems_dict, glt_dict
 
 def get_initial_concentrations(input_file, chems_list, nesting):
     '''Return the vector of initial concentrations in aggregated format.'''
@@ -134,6 +156,21 @@ def get_initial_concentrations(input_file, chems_list, nesting):
 
     return aggregate(initial_concentrations, nesting)
 
+def get_system_glt(input_file, glt_dict, chems_list):
+    # get list of SimulationGasLiquidTransfer instances
+    gl_info = input_file.get("gas-liquid interface")
+    if gl_info:
+        glts = [SimulationGasLiquidTransfer.from_GasLiquidTransfer(glt_dict[glt], chems_list, kla)
+                for glt, kla
+                in (gl_info.get("transfers") or {}).items()]
+    else:
+        glts = []
+    vliq = gl_info.get("vliq", 1)
+    vgas = gl_info.get("vgas", 1)
+    headspace_pressure = gl_info.get("headspace pressure", 1)
+    alpha = gl_info.get("alpha", 1)
+    return SystemGasLiquidTransfers(chems_list, glts, vliq, vgas, headspace_pressure, alpha)
+
 def get_community(input_file, chems_dict, chems_list, reactions_dict):
     populations = list()
     for population_name, population_info in input_file.get("community").items():
@@ -148,7 +185,7 @@ def get_community(input_file, chems_dict, chems_list, reactions_dict):
             # instanciate the catabolism
             # population is set to None because it is not instanciated yet
             simulation_reaction = MetabolicReaction.from_reaction(reaction, chems_list, catabolism_rate, None)
-            catabolisms.append(simulation_reaction )
+            catabolisms.append(simulation_reaction)
         # enzyme allocation
         method_name = population_info["enzyme allocation"]["method"]
         parameters = population_info["enzyme allocation"]["parameters"]
@@ -173,14 +210,17 @@ def get_simulation(input_file):
     D = input_file.get("D", 0)
     # determine the list of chemical species which are involved in the
     # simulation
-    chems_list, nesting, equilibria, reactions_dict, chems_dict = outline_systems_chemistry(input_file)
+    chems_list, nesting, equilibria, reactions_dict, chems_dict, glt_dict = outline_systems_chemistry(input_file)
     y0 = get_initial_concentrations(input_file, chems_list, nesting)
 
     # instanciate the equilibrator
     chems_instances = [chems_dict[name] for name in chems_list]
     system_equilibrator = SystemEquilibrator(chems_instances, equilibria, nesting)
+
+    # instanciate the gas-liquid transfers
+    system_glt = get_system_glt(input_file, glt_dict, chems_list)
  
     # instanciate the community
     community = get_community(input_file, chems_dict, chems_list, reactions_dict)
 
-    return Simulation(chems_list, nesting, system_equilibrator, community, y0, T, D)
+    return Simulation(chems_list, nesting, system_equilibrator, system_glt, community, y0, T, D)

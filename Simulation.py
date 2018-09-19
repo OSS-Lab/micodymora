@@ -5,7 +5,7 @@ from Nesting import aggregate
 from Spinner import spinner
 
 class Simulation:
-    def __init__(self, chems_list, nesting, system_equilibrator, community,
+    def __init__(self, chems_list, nesting, system_equilibrator, system_glt, community,
     initial_concentrations, T, D, logger=lambda s, t, ay, ey: None):
         '''
         * chems_list: list of the name of the chemical species involved in the
@@ -27,6 +27,7 @@ class Simulation:
         self.chems_list = chems_list
         self.nesting = nesting
         self.system_equilibrator = system_equilibrator
+        self.system_glt = system_glt
         self.community = community
         self.y0 = initial_concentrations
         # use the (equilibrated) initial concentrations as definition for the
@@ -58,11 +59,15 @@ class Simulation:
         rates = self.community.get_rates(expanded_y, self.T)
         rate_matrix = np.diag(rates) @ reaction_matrix
         dy_dt_bio = np.sum(rate_matrix, axis=0) # expanded concentrations' derivatives
-        # derivate caused by the chemostat
+        # derivatives caused by the chemostat
         dy_dt_chemo = self.D * (self.input - expanded_y)
+        # derivatives caused by gas-liquid transfers
+        glt_rates = self.system_glt.get_rates(expanded_y, self.T)
+        glt_matrix = self.system_glt.get_matrix()
+        glt_rate_matrix = np.diag(glt_rates) @ glt_matrix
+        dy_dt_glt = np.sum(glt_rate_matrix, axis=0)
 
-        dy_dt = dy_dt_bio + dy_dt_chemo
-        #print(dy_dt[self.chems_list.index("Lac(-)")])
+        dy_dt = dy_dt_bio + dy_dt_chemo + dy_dt_glt
         return aggregate(dy_dt, self.nesting)
 
     def solve(self, time, dt):

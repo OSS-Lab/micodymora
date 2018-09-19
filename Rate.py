@@ -21,6 +21,7 @@ All rate function classes must comply to the same interface:
 
 from operator import mul
 from functools import reduce
+from Constants import T0
 import math
 
 class MM_rate:
@@ -93,6 +94,26 @@ class empirical_anabolism_rate:
         catabolic_rates = self.reaction.population.get_catabolism_rates(C, T)
         return sum(self.Y * catabolic_rates - self.kd)
 
+class gas_transfer_rate:
+    '''Transfer rate of a chemical species between a gas phase and a liquid
+    phase.'''
+    def __init__(self, chems_list, reaction, params):
+        '''Expected parameters:
+        * H0cp: Henry constant (M.atm-1) in standard conditions
+        * Hsol: Enthalpy of solution over R (K)
+        * kla: gas/liquid transfer rate constant (day-1)'''
+        self.reaction = reaction
+        self.kla = params["kla"]
+        self.H0cp = params["H0cp"]
+        self.Hsol = params["Hsol"]
+        self.gas_index = params["gas index"]
+        self.liquid_index = params["liquid index"]
+
+    def __call__(self, C, T):
+        Cg = C[self.gas_index]
+        Cl = C[self.liquid_index]
+        H = self.H0cp * math.exp(1/T - 1/T0)
+        return self.kla * (Cl - Cg * H)
 
 rates_dict = {"MM": MM_rate,
               "Hoh96": HohCordRuwisch_rate,
