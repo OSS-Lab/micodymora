@@ -14,9 +14,12 @@ def plot(data, *labels, **params):
     else:
         plot_function = plt.plot
     for label in labels:
-        y = data[label]
-        plot_function(x, y, label=label)
-        plt.xlabel("time (day)")
+        if label in data:
+            y = data[label]
+            plot_function(x, y, label=label)
+            plt.xlabel("time (day)")
+        else:
+            print("WARNING: label {} not found in data".format(label))
     plt.ylabel("concentration (M)")
     plt.legend()
     plt.show()
