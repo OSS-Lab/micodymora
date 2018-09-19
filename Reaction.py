@@ -18,6 +18,16 @@ class Reaction:
         '''equilibrium constant of the reaction'''
         return np.exp(-self.dG0 / Rkj / T)
 
+    def dG0p(self, T):
+        '''Gibbs energy differential of the reaction (kJ.mol-1) assuming that
+        every chemical species is at standard concentration, except for H+
+        which is at 1e-7 M.'''
+        try:
+            proton_stoich = next(stoich for chem, stoich in self.reagents.items() if chem.name == "H+")
+        except StopIteration:
+            proton_stoich = 0
+        return self.dG0 + Rkj * T * np.log(1e-7 ** proton_stoich) 
+
     def check_balance(self, tolerance=0.01):
         '''Checks the elemental balance of the reaction.
         Throws ImbalancedReactionException if reaction is imbalanced.
@@ -101,7 +111,7 @@ class MetabolicReaction(Reaction):
         for reagent, stoichiometry in self.reagents.items():
             # if the reaction involves a reagent which is purposefully not
             # included in the simulation (eg: water), ignore it
-            if reagent in chems_list:
+            if reagent.name in chems_list:
                 self.stoichiometry_vector[chems_list.index(reagent.name)] = stoichiometry
 
     def lnQ(self, C):
@@ -159,6 +169,7 @@ def load_reactions_dict(chems_path, reactions_path):
 
 if __name__ == "__main__":
     chems_dict = load_chems_dict("data\chems.csv")
-    reaction = Reaction.from_string(chems_dict, "CO2(aq) --> CO2(g)")
+    reactions_dict = load_reactions_dict("data\chems.csv", "data/reactions.dat")
+    reaction = reactions_dict["acetogenesis"]
     print(reaction.K(298.15))
-    print(reaction.dG0)
+    print(reaction.dG0p(298.15))
