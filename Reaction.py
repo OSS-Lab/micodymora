@@ -94,19 +94,18 @@ class Reaction:
         else:
             return "{} --> {}".format(substrates, products)
 
-class MetabolicReaction(Reaction):
-    '''Represents a chemical reaction attached to a population in a simulation.
+class SimulationReaction(Reaction):
+    '''Represents a chemical reaction occuring during a simulation.
     Instances of this class know the stoichiometric vector corresponding to
     their reaction, and also the rate function of the reaction.
     It is then able to compute its mass action ratios and Gibbs energy when
     given a concentration vector
     '''
-    def __init__(self, reagents, chems_list, rate, population, name = None):
+    def __init__(self, reagents, chems_list, rate, name = None):
         super().__init__(reagents, name=name)
         self.chems_list = chems_list
         self.rate = rate
         self.rate.reaction = self
-        self.population = population
         self.stoichiometry_vector = np.zeros(len(chems_list))
         for reagent, stoichiometry in self.reagents.items():
             # if the reaction involves a reagent which is purposefully not
@@ -145,9 +144,37 @@ class MetabolicReaction(Reaction):
         return self.rate(C, T)
 
     @classmethod
+    def from_reaction(cls, reaction, chems_list, rate):
+        '''Constructor using a Reaction instance as basis'''
+        return cls(reaction.reagents, chems_list, rate, name=reaction.name)
+
+    @classmethod
+    def from_string(cls, chems_dict, reaction_string, chems_list, rate, name=None):
+        '''Constructor from string, overrides Reaction.from_string'''
+        reaction = Reaction.from_string(chems_dict, reaction_string, name=name)
+        return cls.from_reaction(reaction, chems_list, rate)
+
+class MetabolicReaction(SimulationReaction):
+    '''Represents a chemical reaction attached to a population in a simulation.
+    Instances of this class know the stoichiometric vector corresponding to
+    their reaction, the rate function of the reaction, and the population to
+    which they belong.
+    It is then able to compute its mass action ratios and Gibbs energy when
+    given a concentration vector
+    '''
+    def __init__(self, reagents, chems_list, rate, population, name = None):
+        super().__init__(reagents, chems_list, rate, name=name)
+        self.population = population
+
+    @classmethod
     def from_reaction(cls, reaction, chems_list, rate, population):
         '''Constructor using a Reaction instance as basis'''
         return cls(reaction.reagents, chems_list, rate, population, name=reaction.name)
+
+    @classmethod
+    def from_simulation_reaction(cls, population):
+        '''Constructor using a SimulationReaction instance as basis'''
+        return cls(reaction.reagents, reaction.chems_list, reaction.rate, population, name=reaction.name)
 
     @classmethod
     def from_string(cls, chems_dict, reaction_string, chems_list, rate, population, name=None):
