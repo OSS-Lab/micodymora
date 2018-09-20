@@ -37,6 +37,7 @@ def load_chems_dict(path):
         next(chems_fh)
         chems_dict = dict()
         for line in chems_fh:
-            name, formula, dGf0, source = line.rstrip().split(",")
-            chems_dict[name] = Chem(name, formula, float(dGf0))
+            if not line.startswith("#"):
+                name, formula, dGf0, source = line.rstrip().split(",")
+                chems_dict[name] = Chem(name, formula, float(dGf0))
     return chems_dict
