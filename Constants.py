@@ -6,3 +6,5 @@ Rpa = R * 1e3 # L.Pa.K-1.mol-1
 Rkj = R / 1000 # kJ.mol-1.K-1
 # standard temperature
 T0 = 298.15 # K
+# Faraday constant
+F = 96485.33289 # C.mol-1

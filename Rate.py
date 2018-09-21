@@ -21,7 +21,7 @@ All rate function classes must comply to the same interface:
 
 from operator import mul
 from functools import reduce
-from Constants import T0
+from Constants import T0, F, Rkj
 import math
 
 class MM_rate:
@@ -32,19 +32,52 @@ class MM_rate:
         '''
         Expected parameters:
         * vmax: maximum reaction rate (day-1)
-        * Ks: {chem_name: Ks} dictionary
+        * Km: {chem_name: Km} dictionary
         '''
         self.reaction = reaction
         self.vmax = params["vmax"]
         # map the chem index instead of the chem name
-        self.Ks = {chems_list.index(chem): float(ks) for chem, ks in params["Ks"].items()}
-        self.description_str = "{} instance: {} * {}".format(self.__class__.__name__, self.vmax, " * ".join("{0} / ({0} + {1})".format(S, Ks) for S, Ks in params["Ks"].items()))
+        self.Km = {chems_list.index(chem): float(ks) for chem, ks in params["Km"].items()}
+        self.description_str = "{} instance: {} * {}".format(self.__class__.__name__, self.vmax, " * ".join("{0} / ({0} + {1})".format(S, Km) for S, Km in params["Km"].items()))
 
     def __call__(self, C, T):
-        return self.vmax * reduce(mul, (C[i] / (C[i] + k) for i, k in self.Ks.items()))
+        return self.vmax * reduce(mul, (C[i] / (C[i] + k) for i, k in self.Km.items()))
 
     def __str__(self):
         return self.description_str
+
+# warning: not debugged yet
+class MM_Larowe2012_rate:
+    '''Rate of a chemical reaction as proposed by LaRowe and collaborators
+    (LaRowe et al., 2012). The rate of the reaction is supposed to be the
+    product of two factors; the first accounting for enzyme kinetics limitation
+    (here multi MM kinetics) and the second being an empirical thermodynamic
+    limitation built as an analogy with the Fermi function.
+    '''
+    def __init__(self, chems_list, reaction, params):
+        '''
+        Expected parameters:
+        * vmax: maximum reaction rate (day-1)
+        * Km: {chem_name: Km} dictionary
+        * dPsi: electrical potential of the cell (mV)
+        * dgamma: number of transfered electrons in the catabolic reaction
+        '''
+        self.reaction = reaction
+        self.vmax = params["vmax"]
+        # map the chem index instead of the chem name
+        self.Km = {chems_list.index(chem): float(ks) for chem, ks in params["Km"].items()}
+        self.dPsi = params["dPsi"]
+        self.dgamma = params["dgamma"]
+
+    def __call__(self, C, T):
+        Fk = self.vmax * reduce(mul, (C[i] / (C[i] + k) for i, k in self.Km.items()))
+        dGr = self.reaction.dG(C, T) / self.dgamma
+        if dGr < 0:
+            # 1e-6 factor to convert mV to V then J to kJ
+            Ft = 1 / (math.exp((dGr + F * self.dPsi * 1e-6) / Rkj / T) + 1)
+        else:
+            Ft = 0
+        return Fk * Ft
 
 class HohCordRuwisch_rate:
     '''Single substrate reaction rate based on MM, accounting for
@@ -53,20 +86,20 @@ class HohCordRuwisch_rate:
         '''
         Expected parameters:
         * vmax: maximum reaction rate (day-1)
-        * Ks: half-saturation concentration for the limiting substrate (M)
+        * Km: half-saturation concentration for the limiting substrate (M)
         * kr: reverse factor
         * limiting: name of the limiting substrate
         '''
         self.reaction = reaction
         self.limiting = chems_list.index(params["limiting"])
         self.vmax = params["vmax"]
-        self.Ks = params["Ks"]
+        self.Km = params["Km"]
         self.kr = params["kr"]
 
     def __call__(self, C, T):
         diseq = math.exp(self.reaction.lnQ(C) - math.log(self.reaction.K(T)))
         S = C[self.limiting]
-        return self.vmax * S * (1 - diseq) / (self.Ks + S * (1 + self.kr * diseq))
+        return self.vmax * S * (1 - diseq) / (self.Km + S * (1 + self.kr * diseq))
 
 class empirical_anabolism_rate:
     '''Empirical population growth rate.
@@ -75,7 +108,7 @@ class empirical_anabolism_rate:
     catabolism is supposed to induce the production of biomass, considering
     a yield Y in molX.molD-1 specific to each catabolism. The overall growth
     rate of a population catalyzing multiple catabolisms is then the sum
-    of all the anabolic rates associated to all individual catabolisms.
+    of all the catabolic rates associated to all individual catabolisms.
     '''
     def __init__(self, chems_list, reaction, params):
         '''
