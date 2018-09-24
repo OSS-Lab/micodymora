@@ -95,6 +95,14 @@ class SystemEquilibrator:
                 trivial_equilibrium = Equilibrium([chems[nesting[i]]], [0])
                 self.equilibria.append(trivial_equilibrium)
 
+    def charge_balance(self, H_guess, concentrations):
+        '''Takes an aggregated concentration vector, computes the
+        expanded equilibrated concentration vector according to the
+        imposed H+ concentration, and return the charge balance of the
+        expanded vector (as a float)'''
+        concentrations[self.H_index] = H_guess
+        return sum(eq.charge_balance(conc, H_guess) for conc, eq in zip(concentrations, self.equilibria))
+
     def equilibrate(self, concentrations):
         '''Takes an aggregated concentration vector, returns an expanded
         concentration vector with the concentration of all reagents, including
@@ -110,16 +118,9 @@ class SystemEquilibrator:
                 eq_result = equilibrium.equilibrate(concentration, H_concentration)
                 equilibrated_concentrations.extend(eq_result)
             return equilibrated_concentrations
-        def charge_balance(H_guess, concentrations):
-            '''Takes an aggregated concentration vector, computes the
-            expanded equilibrated concentration vector according to the
-            imposed H+ concentration, and return the charge balance of the
-            expanded vector (as a float)'''
-            concentrations[self.H_index] = H_guess
-            return sum(eq.charge_balance(conc, H_guess) for conc, eq in zip(concentrations, self.equilibria))
         # determine the value of [H+] for which the charge balance is null, 
         # while accounting for the equilibria
-        H_root = brentq(charge_balance, 1e-14, 1, args=(concentrations,), xtol = H_tolerance)
+        H_root = brentq(self.charge_balance, 1e-14, 1, args=(concentrations,), xtol = H_tolerance)
         # set [H+] and determine the equilibrium concentrations
         concentrations[self.H_index] = H_root
         concentrations = equilibrate_all(concentrations)
