@@ -21,10 +21,29 @@ All rate function classes must comply to the same interface:
 
 from operator import mul
 from functools import reduce
+import abc
 from Constants import T0, F, Rkj
 import math
 
-class MM_rate:
+class MetabolicRate(abc.ABC):
+    # chems list and parameters are passed to the init of any MetabolicRate
+    # class. However they are not necessarily stored as is. It depends on
+    # the class.
+    @abc.abstractmethod
+    def __init__(self, chems_list, parameters):
+        '''
+        Expected parameters:
+        * chems_list: list of the names of the chems involved in the simulation, in
+        the same order as in the concentration vector
+        * parameters: dictionary of the values of the parameters of the rate function
+        '''
+        super().__init__()
+
+    @abc.abstractmethod
+    def __call__(self, C, T):
+        raise NotImplementedError
+
+class MM_rate(MetabolicRate):
     '''Rate of a chemical reaction according to irreversible, multiplicative
     Michaelis-Menten kinetics.
     '''
@@ -47,7 +66,7 @@ class MM_rate:
         return self.description_str
 
 # warning: not debugged yet
-class MM_Larowe2012_rate:
+class MM_Larowe2012_rate(MetabolicRate):
     '''Rate of a chemical reaction as proposed by LaRowe and collaborators
     (LaRowe et al., 2012). The rate of the reaction is supposed to be the
     product of two factors; the first accounting for enzyme kinetics limitation
@@ -79,7 +98,7 @@ class MM_Larowe2012_rate:
             Ft = 0
         return Fk * Ft
 
-class HohCordRuwisch_rate:
+class HohCordRuwisch_rate(MetabolicRate):
     '''Single substrate reaction rate based on MM, accounting for
     thermodynamics. See Hoh and Cord-Ruwisch 1996.'''
     def __init__(self, chems_list, reaction, params):
@@ -101,7 +120,7 @@ class HohCordRuwisch_rate:
         S = C[self.limiting]
         return self.vmax * S * (1 - diseq) / (self.Km + S * (1 + self.kr * diseq))
 
-class empirical_anabolism_rate:
+class empirical_anabolism_rate(MetabolicRate):
     '''Empirical population growth rate.
     The population-scale rate of each catabolism is in molD.t-1 (where D is the
     species by which the reaction's stoichiometry is normalized), and each
@@ -145,7 +164,7 @@ class gas_transfer_rate:
     def __call__(self, C, T):
         Cg = C[self.gas_index]
         Cl = C[self.liquid_index]
-        H = self.H0cp * math.exp(1/T - 1/T0)
+        H = self.H0cp * math.exp(self.Hsol * (1/T - 1/T0))
         return self.kla * (Cl - Cg * H)
 
 rates_dict = {"MM": MM_rate,
