@@ -34,11 +34,11 @@ class SimulationGasLiquidTransfer(GasLiquidTransfer):
         self.liquid_index = chems_list.index(self.liquid_chem.name)
         # instanciate the rate function. Cannot give it its SimulationReaction
         # instance because it does not exist yet.
-        transfer_rate = gas_transfer_rate(chems_list, None, {"kla": self.kla,
-                                                             "Hsol": self.Hsol,
-                                                             "H0cp": self.H0cp,
-                                                             "gas index": self.gas_index,
-                                                             "liquid index": self.liquid_index})
+        transfer_rate = gas_transfer_rate(chems_list, {"kla": self.kla,
+                                                       "Hsol": self.Hsol,
+                                                       "H0cp": self.H0cp,
+                                                       "gas index": self.gas_index,
+                                                       "liquid index": self.liquid_index})
         # Upgrade the reaction from Reaction to SimulationReaction.
         # It will make itself known to the rate instance.
         self.reaction = SimulationReaction.from_reaction(self.reaction, chems_list, transfer_rate)

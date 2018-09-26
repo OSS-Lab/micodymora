@@ -105,7 +105,6 @@ class SimulationReaction(Reaction):
         super().__init__(reagents, name=name)
         self.chems_list = chems_list
         self.rate = rate
-        self.rate.reaction = self
         self.stoichiometry_vector = np.zeros(len(chems_list))
         for reagent, stoichiometry in self.reagents.items():
             # if the reaction involves a reagent which is purposefully not
@@ -141,7 +140,7 @@ class SimulationReaction(Reaction):
         normalized, and X is the biomass catalyzing the reaction.
         * C: concentrations vector (mol.L-1)
         * T: temperature (K)'''
-        return self.rate(C, T)
+        return self.rate(C, T, self)
 
     @classmethod
     def from_reaction(cls, reaction, chems_list, rate):
@@ -154,33 +153,44 @@ class SimulationReaction(Reaction):
         reaction = Reaction.from_string(chems_dict, reaction_string, name=name)
         return cls.from_reaction(reaction, chems_list, rate)
 
+# The only difference between SimulationReaction and MetabolicReaction for the
+# moment is that MetabolicReaction passes population informations to its rate
+# instance
 class MetabolicReaction(SimulationReaction):
     '''Represents a chemical reaction attached to a population in a simulation.
     Instances of this class know the stoichiometric vector corresponding to
-    their reaction, the rate function of the reaction, and the population to
-    which they belong.
+    their reaction, the rate function of the reaction, and pass the informations
+    from the population to which they belong to their rate function.
     It is then able to compute its mass action ratios and Gibbs energy when
     given a concentration vector
     '''
-    def __init__(self, reagents, chems_list, rate, population, name = None):
+    def __init__(self, reagents, chems_list, rate, name = None):
         super().__init__(reagents, chems_list, rate, name=name)
-        self.population = population
+
+    def get_rate(self, C, T, population):
+        '''Returns reaction's rate in molD.molX-1.day-1,
+        where D is the substrate by which the reaction's stoichiometry is
+        normalized, and X is the biomass catalyzing the reaction.
+        * C: concentrations vector (mol.L-1)
+        * T: temperature (K)
+        * population: population to which the reaction belongs'''
+        return self.rate(C, T, self, population)
 
     @classmethod
-    def from_reaction(cls, reaction, chems_list, rate, population):
+    def from_reaction(cls, reaction, chems_list, rate):
         '''Constructor using a Reaction instance as basis'''
-        return cls(reaction.reagents, chems_list, rate, population, name=reaction.name)
+        return cls(reaction.reagents, chems_list, rate, name=reaction.name)
 
     @classmethod
-    def from_simulation_reaction(cls, population):
+    def from_simulation_reaction(cls):
         '''Constructor using a SimulationReaction instance as basis'''
-        return cls(reaction.reagents, reaction.chems_list, reaction.rate, population, name=reaction.name)
+        return cls(reaction.reagents, reaction.chems_list, reaction.rate, name=reaction.name)
 
     @classmethod
-    def from_string(cls, chems_dict, reaction_string, chems_list, rate, population, name=None):
+    def from_string(cls, chems_dict, reaction_string, chems_list, rate, name=None):
         '''Constructor from string, overrides Reaction.from_string'''
         reaction = Reaction.from_string(chems_dict, reaction_string, name=name)
-        return cls.from_reaction(reaction, chems_list, rate, population)
+        return cls.from_reaction(reaction, chems_list, rate)
 
 def load_reactions_dict(chems_path, reactions_path):
     chems_dict = load_chems_dict(chems_path)

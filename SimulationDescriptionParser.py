@@ -179,12 +179,12 @@ def get_community(input_file, chems_dict, chems_list, reactions_dict):
         for pathway in population_info["pathways"]:
             catabolism_info = population_info["pathways"][pathway]
             # instanciate rate function
-            catabolism_rate = rates_dict[catabolism_info["rate"]](chems_list, None, catabolism_info["parameters"])
+            catabolism_rate = rates_dict[catabolism_info["rate"]](chems_list, catabolism_info["parameters"])
             # instanciate reaction
             reaction = reactions_dict[pathway]
             # instanciate the catabolism
             # population is set to None because it is not instanciated yet
-            simulation_reaction = MetabolicReaction.from_reaction(reaction, chems_list, catabolism_rate, None)
+            simulation_reaction = MetabolicReaction.from_reaction(reaction, chems_list, catabolism_rate)
             catabolisms.append(simulation_reaction)
         # enzyme allocation
         method_name = population_info["enzyme allocation"]["method"]
@@ -193,8 +193,8 @@ def get_community(input_file, chems_dict, chems_list, reactions_dict):
         # anabolism
         anabolism_info = population_info["anabolism"]
         anabolism_parameters = anabolism_info["parameters"]
-        anabolism_rate = rates_dict[anabolism_info["rate"]](chems_list, None, anabolism_parameters)
-        anabolism_reaction = MetabolicReaction.from_string(chems_dict, anabolism_info["reaction"], chems_list, anabolism_rate, None)
+        anabolism_rate = rates_dict[anabolism_info["rate"]](chems_list, anabolism_parameters)
+        anabolism_reaction = MetabolicReaction.from_string(chems_dict, anabolism_info["reaction"], chems_list, anabolism_rate)
         populations.append(Population(population_name,
                                       catabolisms,
                                       enzyme_allocation_function,

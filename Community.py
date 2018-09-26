@@ -36,12 +36,12 @@ class Population:
 
     def get_catabolism_rates(self, C, T):
         '''returns the vector of catabolisms rates at population scale'''
-        specific_catabolic_rates = [catabolism.get_rate(C, T) for catabolism in self.catabolisms]
+        specific_catabolic_rates = [catabolism.get_rate(C, T, self) for catabolism in self.catabolisms]
         biomass = C[self.biomass_index]
         return biomass * self.enzyme_allocation(specific_catabolic_rates) * specific_catabolic_rates
 
     def get_anabolism_rate(self, C, T):
-        return self.anabolism.get_rate(C, T)
+        return self.anabolism.get_rate(C, T, self)
 
     def get_matrix(self, C, T):
         catabolism_matrix = self.get_catabolism_matrix(C, T)
