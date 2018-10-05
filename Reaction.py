@@ -78,6 +78,14 @@ class Reaction:
                 reaction_dict[chem] = stoichiometry
         return cls(reaction_dict, name=name)
 
+    def __mul__(self, factor):
+        '''Implement multiplication of reaction's stoichiometry by a numeric factor
+        '''
+        new_stoichiometry = {reagent: stoich * factor
+                             for reagent, stoich
+                             in self.reagents.items()}
+        return Reaction(new_stoichiometry, self.name)
+
     def __str__(self):
         formatted_substrates = ["{}{}".format(stoichiometry != -1 and -stoichiometry or "", chem.name)
                                 for chem, stoichiometry 
@@ -210,3 +218,5 @@ if __name__ == "__main__":
     reaction = reactions_dict["acetogenesis"]
     print(reaction.K(298.15))
     print(reaction.dG0p(298.15))
+    print(reaction)
+    print(reaction * 2)
