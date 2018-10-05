@@ -200,6 +200,55 @@ class MetabolicReaction(SimulationReaction):
         reaction = Reaction.from_string(chems_dict, reaction_string, name=name)
         return cls.from_reaction(reaction, chems_list, rate)
 
+# this class is meant to ultimately replace SimulationReaction and MetabolicReaction
+class SimBioReaction(Reaction):
+    def __init__(self, reagents, chems_list, parameters, name=None):
+        '''
+        * reagents: {Chem: stoichiometry} dict
+        * chems_list: list of the name of the chemical species (as strings)
+        in the same order as in the concentrations vector
+        '''
+        super().__init__(reagents, name=name)
+        self.chems_list = chems_list
+        self.rate = rate
+        self.stoichiometry_vector = np.zeros(len(chems_list))
+        for reagent, stoichiometry in self.reagents.items():
+            # if the reaction involves a reagent which is purposefully not
+            # included in the simulation (eg: water), ignore it
+            if reagent.name in chems_list:
+                self.stoichiometry_vector[chems_list.index(reagent.name)] = stoichiometry
+        self.parameters = parameters
+
+    def lnQ(self, C):
+        '''Natural logarithm of the mass action ratio of the reaction.
+        * C: concentrations vector (mol.L-1)'''
+        return sum(stoich * np.log(conc)
+                    for stoich, conc
+                    in zip(self.stoichiometry_vector, C))
+
+    def dG(self, C, T):
+        '''Compute Gibbs energy differential for non-standard conditions of
+        temperature and concentrations, in kJ.mol-1.
+        * C: concentrations vector (mol.L-1)
+        * T: temperature (K)'''
+        return self.dG0 + Rkj * T * self.lnQ(C)
+
+    def get_vector(self, C, T):
+        '''Returns the reaction's stoichiometric vector, containing values in
+        molW.molD-1, where D is the substrate by which the reaction'
+        stoichiometry is normalized, and W is whatever reagent of the reaction.
+        * C: concentrations vector (mol.L-1)
+        * T: temperature (K)'''
+        return self.stoichiometry_vector
+
+    def __mul__(self, factor):
+        '''Implement multiplication of reaction's stoichiometry by a numeric factor
+        '''
+        new_stoichiometry = {reagent: stoich * factor
+                             for reagent, stoich
+                             in self.reagents.items()}
+        return SimBioReaction(new_stoichiometry, self.chems_list, self.parameters, self.name)
+
 def load_reactions_dict(chems_path, reactions_path):
     chems_dict = load_chems_dict(chems_path)
     with open(reactions_path, "r") as reactions_fh:
