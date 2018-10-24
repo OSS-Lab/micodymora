@@ -78,6 +78,11 @@ class Reaction:
                 reaction_dict[chem] = stoichiometry
         return cls(reaction_dict, name=name)
 
+    def new_SimBioReaction(self, chems_list, parameters):
+        '''Return a SimBioReaction instance based on the current Reaction
+        instance'''
+        return SimBioReaction(self.reagents, chems_list, parameters, name=self.name)
+
     def __mul__(self, factor):
         '''Implement multiplication of reaction's stoichiometry by a numeric factor
         '''
@@ -210,14 +215,19 @@ class SimBioReaction(Reaction):
         '''
         super().__init__(reagents, name=name)
         self.chems_list = chems_list
-        self.rate = rate
-        self.stoichiometry_vector = np.zeros(len(chems_list))
+        self.stoichiometry_vector = np.zeros(len(self.chems_list))
+        self.update_chems_list(chems_list) # the stoichiometry vector is set here
+        self.parameters = parameters
+
+    def update_chems_list(self, new_chems_list):
+        '''Change the chems list and recompute the stoichiometry vector accordingly'''
+        self.chems_list = new_chems_list
+        self.stoichiometry_vector = np.zeros(len(self.chems_list))
         for reagent, stoichiometry in self.reagents.items():
             # if the reaction involves a reagent which is purposefully not
             # included in the simulation (eg: water), ignore it
-            if reagent.name in chems_list:
-                self.stoichiometry_vector[chems_list.index(reagent.name)] = stoichiometry
-        self.parameters = parameters
+            if reagent.name in self.chems_list:
+                self.stoichiometry_vector[self.chems_list.index(reagent.name)] = stoichiometry
 
     def lnQ(self, C):
         '''Natural logarithm of the mass action ratio of the reaction.
@@ -225,6 +235,10 @@ class SimBioReaction(Reaction):
         return sum(stoich * np.log(conc)
                     for stoich, conc
                     in zip(self.stoichiometry_vector, C))
+
+    def disequilibrium(self, C, T):
+        '''logarithm of Mass action ratio divided by equilibrium constant'''
+        return self.lnQ(C) - np.log(self.K(T))
 
     def dG(self, C, T):
         '''Compute Gibbs energy differential for non-standard conditions of

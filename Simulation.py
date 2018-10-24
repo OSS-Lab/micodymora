@@ -17,7 +17,7 @@ class Simulation:
         * community: Community instance
         * initial_concentration: aggregated concentration vector (numpy array)
         * T: system's temperature (1x1 float, K)
-        * D: dilution rate (day-1)
+        * D: dilution rate (hour-1)
         * logger: a function which is called at each integration step and which
         produces side effects intented for logging. The logger function is
         given the simulation instance, the current time, the aggregated
@@ -31,12 +31,19 @@ class Simulation:
         self.community = community
         self.y0 = initial_concentrations
         # use the (equilibrated) initial concentrations as definition for the
-        # chemostat input. Remove the biomassesm though
+        # chemostat input. Remove the population-specific variables
+        # (ATP, biomass...).
         self.input = np.array(self.equilibrate(self.y0))
-        for population in self.community.populations:
-            self.input[population.biomass_index] = 0
+        for index in self.community.get_population_specific_variables_indexes():
+            self.input[index] = 0
         self.T = T
         self.D = D
+        # prepare a vector of dilution rates, where the dilution rate applyied to
+        # each chem is either D or 0 (D being the global dilution rate defined for
+        # the culture medium)
+        self.D_vector = np.ones(len(chems_list)) * D
+        for index in self.community.get_index_of_chems_unaffected_by_dilution():
+            self.D_vector[index] = 0
         self.logger = logger
 
     def equilibrate(self, y):
@@ -48,19 +55,17 @@ class Simulation:
 
     def f(self, t, y):
         '''The function to integrate.
-        * t: time (in day)
+        * t: time (in hour)
         * y: concentration vector (aggregated) (in M)
         '''
         # concentrations shall not be lower than the machine's epsilon
         y = np.clip(y, np.finfo(float).eps, None)
         expanded_y = np.array(self.equilibrate(y))
         # derivatives caused by biological reactions
-        reaction_matrix = self.community.get_matrix(expanded_y, self.T)
-        rates = self.community.get_rates(expanded_y, self.T)
-        rate_matrix = np.diag(rates) @ reaction_matrix
-        dy_dt_bio = np.sum(rate_matrix, axis=0) # expanded concentrations' derivatives
+        bio_derivatives = self.community.get_derivatives(expanded_y, self.T)
+        dy_dt_bio = np.sum(bio_derivatives, axis=0)
         # derivatives caused by the chemostat
-        dy_dt_chemo = self.D * (self.input - expanded_y)
+        dy_dt_chemo = self.D_vector * (self.input - expanded_y)
         # derivatives caused by gas-liquid transfers
         glt_rates = self.system_glt.get_rates(expanded_y, self.T)
         glt_matrix = self.system_glt.get_matrix()
@@ -86,7 +91,7 @@ class Simulation:
             ys.append(expanded_y)
             self.logger(self, solver.t, solver.y, expanded_y)
             waitbar = spinner(int(solver.t), int(time))
-            print("\rintegrating: {} day ".format(waitbar), end="")
+            print("\rintegrating: {} hour ".format(waitbar), end="")
         print()
 
         time_array = np.transpose(np.array(ts))

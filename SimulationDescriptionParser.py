@@ -7,7 +7,7 @@
 from copy import copy
 import numpy as np
 from Nesting import aggregate
-from Chem import load_chems_dict
+from Chem import Chem, load_chems_dict
 from Reaction import Reaction, MetabolicReaction, load_reactions_dict
 from Equilibrium import SystemEquilibrator, load_equilibria_dict
 from GLT import load_glt_dict, SimulationGasLiquidTransfer, SystemGasLiquidTransfers
@@ -16,6 +16,7 @@ from Community import Community, Population
 from Enzyme_allocation import enzyme_allocations_dict
 from Constants import T0
 from Simulation import Simulation
+from GrowthModel import growth_models_dict
 
 default_chems_description_path = "data/chems.csv"
 default_reactions_description_path = "data/reactions.dat"
@@ -27,7 +28,6 @@ class OverlappingEquilibriaException(Exception):
     should not be affected by two different equilibria'''
     pass
 
-# TODO: add an option to ignore species, for example water
 def inventory_chems(chems_dict, reactions, equilibria, glts, initial_concentrations, nevermind=["H2O"]):
     '''Inventories the chemical species needed in a simulation,
     create the population-specific biomass chems,
@@ -126,33 +126,73 @@ def outline_systems_chemistry(input_file):
                 in gl_info.get("transfers", [])]
     else:
         glts = []
- 
-    catabolisms = set()
-    biomasses = dict()
-    for population_name, population_info in input_file.get("community", []).items():
-        biomasses[population_name] = chems_dict[population_info["biomass"]["model"]]
-        for catabolism in population_info["pathways"]:
-            catabolisms.add(reactions_dict[catabolism])
- 
-    chems_list, nesting = inventory_chems(chems_dict, list(catabolisms), equilibria, glts, concentration_settings)
-    chems_dict, chems_list, nesting = record_biomasses(chems_dict, chems_list, nesting, biomasses)
- 
-    return chems_list, nesting, equilibria, reactions_dict, chems_dict, glt_dict
 
-def get_initial_concentrations(input_file, chems_list, nesting):
+    # look at the pathways for catabolic reagents, without instanciating the populations
+    reactions = get_catabolic_reactions(input_file, chems_dict, reactions_dict)
+    # instanciate a preliminary chems list, without the growth-model-specific variables
+    preliminary_chems_list, nesting = inventory_chems(chems_dict, reactions, equilibria, glts, concentration_settings)
+    # instanciate the populations and add their specific variables to the chems list
+    chems_list, nesting, chems_dict, populations = register_biomass(input_file, chems_dict, reactions_dict, preliminary_chems_list, nesting)
+
+    return chems_list, nesting, equilibria, reactions_dict, chems_dict, glt_dict, populations
+
+def get_catabolic_reactions(input_file, chems_dict, reactions_dict):
+    for name, population in input_file.get("community").items():
+        reactions = list()
+        for reaction_string in population.get("pathways"):
+            if "-->" in reaction_string:
+                reaction = Reaction.from_string(chems_dict, reaction_string)
+            else:
+                reaction = reactions_dict[reaction_string]
+            reactions.append(reaction)
+    return reactions
+
+def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting):
+    '''
+    '''
+    population_instances = list()
+    for name, population in input_file.get("community").items():
+        # create the growth model instances for each population
+        # firstly they are created but they lack the knowledge
+        # of the index of their specific variables (biomass, atp...) as it is
+        # not yet recorded in the chems list
+        # FIXME: maybe this part and get_catabolic_reactions could be factorized
+        parameters = population.get("growth model").get("parameters")
+        reactions = list()
+        for reaction_string, reaction_parameters in population.get("pathways").items():
+            if "-->" in reaction_string:
+                reaction = Reaction.from_string(chems_dict, reaction_string)
+            else:
+                reaction = reactions_dict[reaction_string]
+            simbioreaction = reaction.new_SimBioReaction(chems_list, reaction_parameters)
+            reactions.append(simbioreaction)
+        growth_model_name = population.get("growth model").get("name")
+        growth_model = growth_models_dict[growth_model_name](name, chems_list, reactions, parameters)
+
+        # record the growth-model-specific chems
+        specific_chems_indexes = list()
+        for chem in growth_model.specific_chems:
+            chems_list.append(chem)
+            nesting.append(nesting[-1] + 1)
+            specific_chems_indexes.append(len(chems_list) - 1)
+            chems_dict[chem] = Chem(chem)
+        growth_model.register_chems(specific_chems_indexes)
+
+        # now the populations have the knowledge of the index of their specific
+        # variables
+        population_instances.append(growth_model)
+    return chems_list, nesting, chems_dict, population_instances
+
+def get_initial_concentrations(input_file, chems_list, nesting, populations):
     '''Return the vector of initial concentrations in aggregated format.'''
     initial_concentrations = np.zeros(len(chems_list)) + np.finfo(float).eps
     concentration_settings = input_file.get("concentrations", {})
     for chem_name, chem_conc in concentration_settings.items():
         initial_concentrations[chems_list.index(chem_name)] = chem_conc
 
-    # get concentration of biomass
-    populations_concentrations = dict()
-    for population_name, population_info in input_file.get("community", []).items():
-        populations_concentrations[population_name] = population_info["biomass"]["concentration"]
-
-    for pop_name, conc in populations_concentrations.items():
-        initial_concentrations[chems_list.index(pop_name)] = chem_conc
+    # set concentration of populations-specific variables
+    for population in populations:
+        initial_concentrations = population.set_initial_concentrations(initial_concentrations)
 
     return aggregate(initial_concentrations, nesting)
 
@@ -210,8 +250,8 @@ def get_simulation(input_file):
     D = input_file.get("D", 0)
     # determine the list of chemical species which are involved in the
     # simulation
-    chems_list, nesting, equilibria, reactions_dict, chems_dict, glt_dict = outline_systems_chemistry(input_file)
-    y0 = get_initial_concentrations(input_file, chems_list, nesting)
+    chems_list, nesting, equilibria, reactions_dict, chems_dict, glt_dict, populations = outline_systems_chemistry(input_file)
+    y0 = get_initial_concentrations(input_file, chems_list, nesting, populations)
 
     # instanciate the equilibrator
     chems_instances = [chems_dict[name] for name in chems_list]
@@ -221,6 +261,12 @@ def get_simulation(input_file):
     system_glt = get_system_glt(input_file, glt_dict, chems_list)
  
     # instanciate the community
-    community = get_community(input_file, chems_dict, chems_list, reactions_dict)
+    community = Community(populations)
 
     return Simulation(chems_list, nesting, system_equilibrator, system_glt, community, y0, T, D)
+
+if __name__ == "__main__":
+    import yaml
+    with open("simulation2.yaml", "r") as fh:
+        input_file = yaml.safe_load(fh)
+    get_simulation(input_file)

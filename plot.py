@@ -24,9 +24,12 @@ def plot(data, *labels, **params):
     plt.legend()
     plt.show()
 
-def pHplot(data):
+def fraction_plot(data, *labels, **params):
     x = data["time"]
-    y = data["H+"].apply(lambda x: -math.log10(x))
-    plt.plot(x, y, 2)
-    plt.ylabel("pH")
+    y = data[[*labels]]
+    y_frac = y.divide(y.sum(axis=1), axis=0)
+    plt.stackplot(x, *[y_frac[label] for label in labels], labels=labels)
+    plt.xlabel("time (day)")
+    plt.legend()
     plt.show()
+
