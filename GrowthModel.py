@@ -125,11 +125,11 @@ class ThermoAllocationModel(GrowthModel):
         the proteome, scaled to 1'''
         # total phi is without phi x
         total_phi = y[self.phi_r] + sum(y[phi_cat] for phi_cat in self.phi_cat.values())
-        r = {"x": self.phi_x, "r": y[self.phi_r] / total_phi * (1 - self.phi_x - self.phi_an)}
         cat = {name: y[phi_cat] / total_phi * (1 - self.phi_x - self.phi_an)
                for name, phi_cat 
                in self.phi_cat.items()}
-        return {**r, **cat}
+        other = {"x": self.phi_x, "r": max(0, y[self.phi_r]) / total_phi * (1 - self.phi_x - self.phi_an)}
+        return {**other, **cat}
 
     def proteome_derivatives(self, y, T, cat_atp_flows, katp):
         '''Proteome reallocation strategy
