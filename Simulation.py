@@ -1,12 +1,32 @@
 from scipy.integrate import odeint, ode
+import abc
 import numpy as np
 import pandas as pd
 from Nesting import aggregate
 from Spinner import spinner
 
+class AbstractLogger(abc.ABC):
+    '''Defines the interface that a logger class should have'''
+    @abc.abstractmethod
+    def __init__(self):
+        pass
+
+    @abc.abstractmethod
+    def do_log(self, simulation, time, nested_y, expanded_y):
+        pass
+
+class BlankLogger(AbstractLogger):
+    '''Minimalistic implementation of a Logger class.
+    Basically does nothing.'''
+    def __init__(self):
+        pass
+
+    def do_log(self, simulation, time, nested_y, expanded_y):
+        pass
+
 class Simulation:
     def __init__(self, chems_list, nesting, system_equilibrator, system_glt, community,
-    initial_concentrations, T, D, logger=lambda s, t, ay, ey: None):
+    initial_concentrations, T, D, logger=BlankLogger()):
         '''
         * chems_list: list of the name of the chemical species involved in the
         simulation, in the same order as in the expanded concentration vector
@@ -18,11 +38,7 @@ class Simulation:
         * initial_concentration: aggregated concentration vector (numpy array)
         * T: system's temperature (1x1 float, K)
         * D: dilution rate (hour-1)
-        * logger: a function which is called at each integration step and which
-        produces side effects intented for logging. The logger function is
-        given the simulation instance, the current time, the aggregated
-        concentrations vector and the expanded concentrations vector as
-        arguments.
+        * logger: a logger instance inheriting from AbstractLogger
         '''
         self.chems_list = chems_list
         self.nesting = nesting
@@ -44,6 +60,7 @@ class Simulation:
         self.D_vector = np.ones(len(chems_list)) * D
         for index in self.community.get_index_of_chems_unaffected_by_dilution():
             self.D_vector[index] = 0
+        assert issubclass(type(logger), AbstractLogger)
         self.logger = logger
 
     def equilibrate(self, y):
@@ -89,7 +106,7 @@ class Simulation:
             expanded_y = self.equilibrate(solver.y)
             ts.append(solver.t)
             ys.append(expanded_y)
-            self.logger(self, solver.t, solver.y, expanded_y)
+            self.logger.do_log(self, solver.t, solver.y, expanded_y)
             waitbar = spinner(int(solver.t), int(time))
             print("\rintegrating: {} hour ".format(waitbar), end="")
         print()
