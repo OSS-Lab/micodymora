@@ -147,21 +147,30 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
                 reaction = reactions_dict[reaction_string]
             simbioreaction = reaction.new_SimBioReaction(chems_list, reaction_parameters)
             reactions.append(simbioreaction)
+        # instanciate the population
         growth_model_name = population.get("growth model").get("name")
         growth_model = growth_models_dict[growth_model_name](name, chems_list, reactions, parameters)
-
-        # record the growth-model-specific chems
-        specific_chems_indexes = list()
+        population_instances.append(growth_model)
+        # add the specific chems of the population to chems list, chems dict and nestings list
+        chems_list.extend(growth_model.specific_chems)
         for chem in growth_model.specific_chems:
-            chems_list.append(chem)
             nesting.append(nesting[-1] + 1)
-            specific_chems_indexes.append(len(chems_list) - 1)
             chems_dict[chem] = Chem(chem)
-        growth_model.register_chems(specific_chems_indexes)
+
+    # give the populations the knowledge of the index of their specific variables
+    for population in population_instances:
+        specific_chems_indexes = [chems_list.index(chem) for chem in population.specific_chems]
+        population.register_chems(specific_chems_indexes)
+
+    # record the growth-model-specific chems
+#    for chem in growth_model.specific_chems:
+#        nesting.append(nesting[-1] + 1)
+#        specific_chems_indexes.append(len(chems_list) - 1)
+#        chems_dict[chem] = Chem(chem)
+#    growth_model.register_chems(specific_chems_indexes)
 
         # now the populations have the knowledge of the index of their specific
         # variables
-        population_instances.append(growth_model)
     return chems_list, nesting, chems_dict, population_instances
 
 def get_initial_concentrations(input_file, chems_list, nesting, populations):
