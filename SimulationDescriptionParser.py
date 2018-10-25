@@ -11,7 +11,7 @@ from Chem import Chem, load_chems_dict
 from Reaction import Reaction, MetabolicReaction, load_reactions_dict
 from Equilibrium import SystemEquilibrator, load_equilibria_dict
 from GLT import load_glt_dict, SimulationGasLiquidTransfer, SystemGasLiquidTransfers
-from Community import Community, Population
+from Community import Community
 from Enzyme_allocation import enzyme_allocations_dict
 from Constants import T0
 from Simulation import Simulation
