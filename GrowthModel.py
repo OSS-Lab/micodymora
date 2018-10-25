@@ -1,5 +1,5 @@
 import abc
-from Constants import Rkj, T0
+from Constants import Rkj, T0, F
 import numpy as np
 import functools
 import operator
@@ -230,6 +230,15 @@ class RateFunction(abc.ABC):
         pass
 
 class MM_kinetics(RateFunction):
+    '''Rate of a chemical reaction according to irreversible, multiplicative
+    Michaelis-Menten kinetics.
+
+    Expected pathway parameters:
+    * vmax: maximum reaction rate (hour-1)
+    * Km: half-saturation concentration for the limiting substrate (M),
+    set as a dictionary mapping the name of a limiting substrate to its
+    Km value.
+    '''
     def __init__(self, chems_list, parameters, growth_model_parameters):
         self.chems_list = chems_list
 
@@ -247,7 +256,57 @@ class MM_kinetics(RateFunction):
         km_couples = pathway.parameters["MMKm"].items()
         return vmax * functools.reduce(operator.mul, (C[i] / (C[i] + k) for i, k in km_couples))
 
+# WARNING: untested
+class HohCordRuwischRate(RateFunction):
+    '''
+    Mono-substrate MM-based reaction rate accounting for thermodynamic limitation
+
+    Expected parameters:
+    * vmax: maximum reaction rate (hour-1)
+    * Km: half-saturation concentration for the limiting substrate (M)
+    * kr: reverse factor
+    * limiting: name of the limiting substrate
+
+    Expected pathway methods:
+    * disequilibrium(C, T): the ratio of the reaction's mass action ratio over
+    its equilibrium constant (Q/K)
+    '''
+    def __init__(self, chems_list, parameters, growth_model_parameters):
+        self.chems_list = chems_list
+
+    def prepare(self, pathway):
+        assert "vmax" in pathway.parameters
+        assert "kr" in pathway.parameters
+        assert "Km" in pathway.parameters
+        assert "limiting" in pathway.parameters
+        pathway.parameters["limiting index"] = self.chems_list.index(pathway.parameters["limiting"])
+
+    def rate(self, pathway, C, T):
+        disequilibrium = pathway.disequilibrium(C, T)
+        S = C[pathway.parameters["limiting index"]]
+        Km = pathway.parameters["Km"]
+        kr = pathway.parameters["kr"]
+        vmax = pathway.parameters["vmax"]
+        return vmax * S * (1 - disequilibrium) / (Km + S * (1 + kr * disequilibrium))
+
 class JinBethkeFT(RateFunction):
+    '''
+    [0-1] thermodynamic rate limitation factor based on Boudart's model
+    (Boudart, 1976).
+
+    Expected growth model parameters:
+    * dGatp: Gibbs energy differential to consider for the hydrolysis of ATP
+
+    Expected pathway parameters:
+    * m: number of ATP molecules produced by the pathway (molATP.turnover-1)
+    * chi: average stoichiometric coefficient of the reaction, accounting for
+    the fact that the reaction actually consists in multiple steps running at
+    different speeds. Assumed to be 1 if not set.
+
+    Expected pathway methods:
+    * dG(C, T): the Gibbs energy differential of the pathway, ajusting it for
+    non-standard temperature and concentrations
+    '''
     def __init__(self, chems_list, parameters, growth_model_parameters):
         '''
         * dGatp: Gibbs energy differential to consider for the hydrolysis of ATP
@@ -258,12 +317,6 @@ class JinBethkeFT(RateFunction):
     def prepare(self, pathway):
         assert "m" in pathway.parameters
         assert "dG" in dir(pathway)
-        # the reaction should have a chi parameter, which represents the
-        # "average stoichiometric coefficient" of the reaction, which is
-        # supposed to actually consist in multiple steps, not necessarily
-        # running at the same speed. However as this parameter is often
-        # ignored so it is tolerated that it is not provided, and in this
-        # case it is assigned a default, neutral value of 1
         if "chi" not in pathway.parameters:
             pathway.parameters["chi"] = 1
 
@@ -273,7 +326,37 @@ class JinBethkeFT(RateFunction):
             dissipation = 0
         return 1 - np.exp(dissipation / pathway.parameters["chi"] / T / Rkj)
 
+# WARNING: not validated
+class LaRowe2012FT(RateFunction):
+    '''
+    Expected pathway parameters:
+    * dPsi: electrical potential of the cell (mV)
+    * dgamma: number of transfered electrons in the catabolic reaction
+
+    Expected pathway methods:
+    * dG(C, T): the Gibbs energy differential of the pathway, ajusting it for
+    non-standard temperature and concentrations
+    '''
+    def __init__(self, chems_list, parameters, growth_model_parameters):
+        self.chems_list = chems_list
+
+    def prepare(self, pathway):
+        assert "dPsi" in pathway.parameters
+        assert "dgamma" in pathway.parameters
+
+    def rate(self, pathway, C, T):
+        dGr = pathway.dG(C, T) / pathway.parameters["dgamma"]
+        if dGr < 0:
+            # 1e-6 factor to convert mV to V then J to kJ
+            FT = 1 / (np.exp((dGr + F * pathway.parameters["dPsi"] * 1e-6) / Rkj / T) + 1)
+        else:
+            FT = 0
+        return FT
+
+
 _rates_dict = {"MM": MM_kinetics,
-               "JinBethkeFT": JinBethkeFT}
+               "HohCordRuwisch": HohCordRuwischRate,
+               "JinBethkeFT": JinBethkeFT,
+               "LaRowe2012FT": LaRowe2012FT}
 
 growth_models_dict = {"ThermoAllocationModel": ThermoAllocationModel}

@@ -11,7 +11,6 @@ from Chem import Chem, load_chems_dict
 from Reaction import Reaction, MetabolicReaction, load_reactions_dict
 from Equilibrium import SystemEquilibrator, load_equilibria_dict
 from GLT import load_glt_dict, SimulationGasLiquidTransfer, SystemGasLiquidTransfers
-from Rate import rates_dict
 from Community import Community, Population
 from Enzyme_allocation import enzyme_allocations_dict
 from Constants import T0
@@ -73,24 +72,6 @@ def inventory_chems(chems_dict, reactions, equilibria, glts, initial_concentrati
             chems_list.append(chem)
             nesting.append(nesting[-1] + 1)
     return chems_list, nesting
-
-def record_biomasses(chems_dict, chems_list, nesting, biomasses):
-    '''For each population to simulate, creates an item in the chems list
-    and create a new entry in the chem dictionary for the populations' biomass.
-    Basically the new entry is a copy of an existing chem, but named after
-    the population.
-    * chems_dict: dictionary of Chem instances ({chem_name: Chem}) to be used
-    * chems_list: list of the name of the chemical species in the system
-    * biomasses: dictionary mapping the name of the populations in the system
-       to the Chem instance used as a model for their biomass
-    '''
-    for population_name, biomass_model in biomasses.items():
-       chems_list.append(population_name)
-       population_biomass = copy(biomass_model)
-       population_biomass.name = population_name
-       chems_dict[population_name] = population_biomass
-       nesting.append(nesting[-1] + 1)
-    return chems_dict, chems_list, nesting
 
 def outline_systems_chemistry(input_file):
     '''This function does a lot of different things. Basically, it looks at all
@@ -210,37 +191,6 @@ def get_system_glt(input_file, glt_dict, chems_list):
     headspace_pressure = gl_info.get("headspace pressure", 1)
     alpha = gl_info.get("alpha", 1)
     return SystemGasLiquidTransfers(chems_list, glts, vliq, vgas, headspace_pressure, alpha)
-
-def get_community(input_file, chems_dict, chems_list, reactions_dict):
-    populations = list()
-    for population_name, population_info in input_file.get("community").items():
-        biomass_index = chems_list.index(population_name)
-        catabolisms = list()
-        for pathway in population_info["pathways"]:
-            catabolism_info = population_info["pathways"][pathway]
-            # instanciate rate function
-            catabolism_rate = rates_dict[catabolism_info["rate"]](chems_list, catabolism_info["parameters"])
-            # instanciate reaction
-            reaction = reactions_dict[pathway]
-            # instanciate the catabolism
-            # population is set to None because it is not instanciated yet
-            simulation_reaction = MetabolicReaction.from_reaction(reaction, chems_list, catabolism_rate)
-            catabolisms.append(simulation_reaction)
-        # enzyme allocation
-        method_name = population_info["enzyme allocation"]["method"]
-        parameters = population_info["enzyme allocation"]["parameters"]
-        enzyme_allocation_function = enzyme_allocations_dict[method_name](parameters)
-        # anabolism
-        anabolism_info = population_info["anabolism"]
-        anabolism_parameters = anabolism_info["parameters"]
-        anabolism_rate = rates_dict[anabolism_info["rate"]](chems_list, anabolism_parameters)
-        anabolism_reaction = MetabolicReaction.from_string(chems_dict, anabolism_info["reaction"], chems_list, anabolism_rate)
-        populations.append(Population(population_name,
-                                      catabolisms,
-                                      enzyme_allocation_function,
-                                      anabolism_reaction,
-                                      biomass_index))
-    return Community(populations)
 
 def get_simulation(input_file):
     # get system's temperature

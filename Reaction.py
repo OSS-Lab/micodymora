@@ -237,8 +237,8 @@ class SimBioReaction(Reaction):
                     in zip(self.stoichiometry_vector, C))
 
     def disequilibrium(self, C, T):
-        '''logarithm of Mass action ratio divided by equilibrium constant'''
-        return self.lnQ(C) - np.log(self.K(T))
+        '''Mass action ratio divided by equilibrium constant (Q/K)'''
+        return np.exp(self.lnQ(C) - np.log(self.K(T)))
 
     def dG(self, C, T):
         '''Compute Gibbs energy differential for non-standard conditions of
