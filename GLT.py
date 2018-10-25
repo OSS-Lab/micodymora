@@ -1,23 +1,20 @@
 from Constants import T0
-from Reaction import Reaction, SimulationReaction
-from Rate import gas_transfer_rate
 from Chem import load_chems_dict
 import numpy as np
 
 class GasLiquidTransfer:
-    def __init__(self, gas_chem, liquid_chem, reaction, H0cp, Hsol):
+    def __init__(self, gas_chem, liquid_chem, H0cp, Hsol):
         '''
         * reaction: Reaction instance
         * H0cp: Henry constant (M.atm-1) in standard conditions
         * Hsol: Enthalpy of solution over R (K)'''
         self.gas_chem = gas_chem
         self.liquid_chem = liquid_chem
-        self.reaction = reaction
         self.H0cp = H0cp
         self.Hsol = Hsol
 
 class SimulationGasLiquidTransfer(GasLiquidTransfer):
-    def __init__(self, gas_chem, liquid_chem, reaction, H0cp, Hsol, chems_list, kla):
+    def __init__(self, gas_chem, liquid_chem, H0cp, Hsol, chems_list, kla):
         '''
         * reaction: Reaction instance. Is upgraded to a SimulationReaction
         instance during the instanciation.
@@ -26,28 +23,24 @@ class SimulationGasLiquidTransfer(GasLiquidTransfer):
         the simulation, in the same order as in the concentration vector
         '''
         # first initialise the instance as a GasLiquidTransfer
-        super().__init__(gas_chem, liquid_chem, reaction, H0cp, Hsol)
+        super().__init__(gas_chem, liquid_chem, H0cp, Hsol)
         self.kla = kla
         # then get the index of the gas and liquid species as they
         # are needed by the rate function
         self.gas_index = chems_list.index(self.gas_chem.name)
         self.liquid_index = chems_list.index(self.liquid_chem.name)
-        # instanciate the rate function. Cannot give it its SimulationReaction
-        # instance because it does not exist yet.
-        transfer_rate = gas_transfer_rate(chems_list, {"kla": self.kla,
-                                                       "Hsol": self.Hsol,
-                                                       "H0cp": self.H0cp,
-                                                       "gas index": self.gas_index,
-                                                       "liquid index": self.liquid_index})
-        # Upgrade the reaction from Reaction to SimulationReaction.
-        # It will make itself known to the rate instance.
-        self.reaction = SimulationReaction.from_reaction(self.reaction, chems_list, transfer_rate)
+        self.stoichiometry_vector = np.zeros(len(chems_list))
+        self.stoichiometry_vector[self.gas_index] = 1
+        self.stoichiometry_vector[self.liquid_index] = -1
         
     def get_vector(self):
-        return self.reaction.stoichiometry_vector
+        return self.stoichiometry_vector
 
     def get_rate(self, C, T):
-        return self.reaction.get_rate(C, T)
+        Cg = C[self.gas_index]
+        Cl = C[self.liquid_index]
+        H = self.H0cp * np.exp(self.Hsol * (1/T - 1/T0))
+        return self.kla * (Cl - Cg * H)
 
     def get_partial_pressure(self, C):
         return C[self.gas_index]
@@ -55,7 +48,7 @@ class SimulationGasLiquidTransfer(GasLiquidTransfer):
     @classmethod
     def from_GasLiquidTransfer(cls, glt, chems_list, kla):
         '''Constructor from GasLiquidTransfer'''
-        return cls(glt.gas_chem, glt.liquid_chem, glt.reaction, glt.H0cp, glt.Hsol, chems_list, kla)
+        return cls(glt.gas_chem, glt.liquid_chem, glt.H0cp, glt.Hsol, chems_list, kla)
 
 class SystemGasLiquidTransfers:
     def __init__(self, chems_list, transfers, vliq, vgas, headspace_pressure, alpha):
@@ -95,7 +88,6 @@ def load_glt_dict(chems_data_path, glt_data_path):
         for line in stream:
             if not line.startswith("#"):
                 name, liquid, gas, H0cp, Hsol = line.rstrip().split(",")
-                reaction = Reaction({chems_dict[liquid]: -1, chems_dict[gas]: +1})
-                glt = GasLiquidTransfer(chems_dict[gas], chems_dict[liquid], reaction, float(H0cp), float(Hsol))
+                glt = GasLiquidTransfer(chems_dict[gas], chems_dict[liquid], float(H0cp), float(Hsol))
                 glt_dict[name] = glt
     return glt_dict
