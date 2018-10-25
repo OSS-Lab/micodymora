@@ -70,13 +70,22 @@ class Simulation:
         '''
         return self.system_equilibrator.equilibrate(y)
 
+    def concentrations_pretreatment(self, y):
+        '''This function centralizes the eventual pretreatments performed
+        on the concentration vector y before derivatives are computed
+        based on it.
+        The purpose of this function is to make those modifications
+        more explicit and to provide the eventual Logger instance with
+        an easy way to call them.'''
+        # concentrations shall not be lower than the machine's epsilon
+        return np.clip(y, np.finfo(float).eps, None)
+
     def f(self, t, y):
         '''The function to integrate.
         * t: time (in hour)
         * y: concentration vector (aggregated) (in M)
         '''
-        # concentrations shall not be lower than the machine's epsilon
-        y = np.clip(y, np.finfo(float).eps, None)
+        y = self.concentrations_pretreatment(y)
         expanded_y = np.array(self.equilibrate(y))
         # derivatives caused by biological reactions
         bio_derivatives = self.community.get_derivatives(expanded_y, self.T)
