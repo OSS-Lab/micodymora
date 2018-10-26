@@ -4,23 +4,25 @@
 # For a better comprehension of the code, it is suggested to start reading the
 # `get_simulation` function first
 
+from micodymora.Nesting import aggregate
+from micodymora.Chem import Chem, load_chems_dict
+from micodymora.Reaction import Reaction, MetabolicReaction, load_reactions_dict
+from micodymora.Equilibrium import SystemEquilibrator, load_equilibria_dict
+from micodymora.GLT import load_glt_dict, SimulationGasLiquidTransfer, SystemGasLiquidTransfers
+from micodymora.Community import Community
+from micodymora.Constants import T0
+from micodymora.Simulation import Simulation
+from micodymora.GrowthModel import growth_models_dict
+
 from copy import copy
 import numpy as np
-from Nesting import aggregate
-from Chem import Chem, load_chems_dict
-from Reaction import Reaction, MetabolicReaction, load_reactions_dict
-from Equilibrium import SystemEquilibrator, load_equilibria_dict
-from GLT import load_glt_dict, SimulationGasLiquidTransfer, SystemGasLiquidTransfers
-from Community import Community
-from Enzyme_allocation import enzyme_allocations_dict
-from Constants import T0
-from Simulation import Simulation
-from GrowthModel import growth_models_dict
+import os
 
-default_chems_description_path = "data/chems.csv"
-default_reactions_description_path = "data/reactions.dat"
-default_equilibria_description_path = "data/equilibria.dat"
-default_glt_description_path = "data/gas_liquid_transfer.dat"
+module_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data")
+default_chems_description_path = os.path.join(module_path, "chems.csv")
+default_reactions_description_path = os.path.join(module_path, "reactions.dat")
+default_equilibria_description_path = os.path.join(module_path, "equilibria.dat")
+default_glt_description_path = os.path.join(module_path, "gas_liquid_transfer.dat")
 
 class OverlappingEquilibriaException(Exception):
     '''When the system's equilibria are defined, a single chemical species

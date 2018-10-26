@@ -1,5 +1,6 @@
-from Constants import T0
-from Chem import load_chems_dict
+from micodymora.Constants import T0
+from micodymora.Chem import load_chems_dict
+
 import numpy as np
 
 class GasLiquidTransfer:

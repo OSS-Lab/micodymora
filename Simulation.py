@@ -1,9 +1,10 @@
+from micodymora.Nesting import aggregate
+from micodymora.Spinner import spinner
+
 from scipy.integrate import odeint, ode
 import abc
 import numpy as np
 import pandas as pd
-from Nesting import aggregate
-from Spinner import spinner
 
 class AbstractLogger(abc.ABC):
     '''Defines the interface that a logger class should have'''

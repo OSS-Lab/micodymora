@@ -63,6 +63,3 @@ def load_chems_dict(path):
                 name, formula, dGf0, source = line.rstrip().split(",")
                 chems_dict[name] = Molecule(name, formula, float(dGf0))
     return chems_dict
-
-if __name__ == "__main__":
-    print(Molecule("Mg+2", "Mg+2", 0).composition)

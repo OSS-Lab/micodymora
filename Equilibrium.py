@@ -1,13 +1,15 @@
-from Chem import load_chems_dict
-from Reaction import Reaction
-from Constants import T0
-import math
+from micodymora.Chem import load_chems_dict
+from micodymora.Reaction import Reaction
+from micodymora.Constants import T0
+
+import os
 import numpy as np
 from scipy.optimize import brentq
 
 # tolerance for Brent's method when determining [H+]
 H_tolerance = 1e-12
-chems_dict = load_chems_dict("data\chems.csv") # only needed by WaterEquilibrium
+chems_dict_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data", "chems.csv")
+chems_dict = load_chems_dict(chems_dict_path) # only needed by WaterEquilibrium
 
 class Equilibrium:
     def __init__(self, chems, pK):
@@ -139,7 +141,7 @@ def load_equilibria_dict(chems_path, equilibria_path):
     '''
     chems_dict = load_chems_dict(chems_path)
     equilibria_dict = dict()
-    with open("data/equilibria.dat", "r") as fh:
+    with open(equilibria_path, "r") as fh:
         for line in fh:
             if not line.startswith("#"):
                 name, reagents, pKs_str = [field.lstrip().rstrip() for field in line.split(":")]
@@ -159,6 +161,6 @@ if __name__ == "__main__":
     # and that they totally dissolve and never reprecipitate with Na+
     conc = [1e-7, 1e-7, 1e-3, 1e-3, 1e-3, 4e-3, 1e-3]
     eq_conc = se.equilibrate(conc)
-    print("pH: {:.2f}".format(-math.log10(eq_conc[0])))
+    print("pH: {:.2f}".format(-np.log10(eq_conc[0])))
     for chem, conc in zip(chems, eq_conc):
         print("{}: {:2.2e}".format(chem.name, conc))

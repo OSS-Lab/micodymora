@@ -1,5 +1,6 @@
+from micodymora.Constants import Rkj, T0, F
+
 import abc
-from Constants import Rkj, T0, F
 import numpy as np
 import functools
 import operator

@@ -1,8 +1,9 @@
+from micodymora.Chem import load_chems_dict
+from micodymora.Constants import Rkj
+
 import re
 import collections
 import numpy as np
-from Chem import load_chems_dict
-from Constants import Rkj
 
 class ImbalancedReactionException(Exception):
     pass
@@ -274,12 +275,3 @@ def load_reactions_dict(chems_path, reactions_path):
             reaction.check_balance()
             reactions_dict[reaction_name] = reaction
     return reactions_dict
-
-if __name__ == "__main__":
-    chems_dict = load_chems_dict("data\chems.csv")
-    reactions_dict = load_reactions_dict("data\chems.csv", "data/reactions.dat")
-    reaction = reactions_dict["acetogenesis"]
-    print(reaction.K(298.15))
-    print(reaction.dG0p(298.15))
-    print(reaction)
-    print(reaction * 2)
