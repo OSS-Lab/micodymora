@@ -184,7 +184,6 @@ class ThermoAllocationModel(GrowthModel):
         backward_atp_rate = X * (self.maintenance(T) / self.xaa / self.dGatp
                                  + scaled_phis["r"] * self.vt * (self.nu_atp_tr + self.nu_atp_an))
         katp = forward_atp_rate / backward_atp_rate
-        tracker.update_log(f"{self.population_name}: {katp:.2e}")
         if katp:
             ATP = self.iap / (1 + 1 / katp)
         else:
