@@ -132,7 +132,7 @@ class ThermoAllocationModel(GrowthModel):
         other = {"x": self.phi_x, "r": max(0, y[self.phi_r]) / total_phi * (1 - self.phi_x - self.phi_an)}
         return {**other, **cat}
 
-    def proteome_derivatives(self, y, T, cat_atp_flows, katp):
+    def proteome_derivatives(self, y, T, cat_atp_flows, katp, tracker):
         '''Proteome reallocation strategy
         * y: system's concentrations vector
         * T: system's temperature
@@ -156,7 +156,7 @@ class ThermoAllocationModel(GrowthModel):
 
         return derivatives_vector
 
-    def rcat(self, y, T):
+    def rcat(self, y, T, tracker):
         scaled_phis = self.scaled_phi(y)
         rcat_list = list()
         X = y[self.X]
@@ -175,7 +175,7 @@ class ThermoAllocationModel(GrowthModel):
     def get_derivatives(self, y, T, tracker):
         scaled_phis = self.scaled_phi(y)
         # get the vector of derivatives, without anabolism
-        rcat = self.rcat(y, T)
+        rcat = self.rcat(y, T, tracker)
         X = y[self.X]
         derivatives = rcat @ self.reaction_matrix
         # compute the ATP concentration
@@ -192,7 +192,7 @@ class ThermoAllocationModel(GrowthModel):
         mu = scaled_phis["r"] * X * self.vt * ATP / (self.Katp + ATP)
         derivatives[self.X] = mu
         # add proteome derivatives
-        derivatives += self.proteome_derivatives(y, T, cat_atp_flows, katp)
+        derivatives += self.proteome_derivatives(y, T, cat_atp_flows, katp, tracker)
         return derivatives
 
 class RateFunction(abc.ABC):
