@@ -63,6 +63,11 @@ class BlankProgressTracker(AbstractProgressTracker):
     def update_log(self, message):
         pass
 
+# status attribute:
+# 0: has not run yet
+# 1: is running
+# 2: has run until the end
+# 3: has run but stopped before the end
 class Simulation:
     def __init__(self, chems_list, nesting, system_equilibrator, system_glt, community,
     initial_concentrations, T, D, logger=BlankLogger(), progress_tracker=BlankProgressTracker()):
@@ -103,6 +108,7 @@ class Simulation:
         self.logger = logger
         assert issubclass(type(progress_tracker), AbstractProgressTracker)
         self.progress_tracker = progress_tracker
+        self.status = 0
 
     def equilibrate(self, y):
         '''Takes an aggregated concentration vector, returns an expanded
@@ -152,6 +158,7 @@ class Simulation:
         ts = []
         ys = []
 
+        self.status = 1
         while solver.successful() and solver.t < time:
             solver.integrate(solver.t + dt)
             expanded_y = self.equilibrate(solver.y)
@@ -162,6 +169,10 @@ class Simulation:
             waitbar = spinner(int(solver.t), int(time))
             print("\rintegrating: {} hour ".format(waitbar), end="")
         print()
+        if solver.t >= time:
+            self.status = 2
+        else:
+            self.status = 3
 
         time_array = np.transpose(np.array(ts))
         conc_array = np.vstack(ys)
