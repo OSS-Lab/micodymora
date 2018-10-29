@@ -37,7 +37,7 @@ class SimulationGasLiquidTransfer(GasLiquidTransfer):
     def get_vector(self):
         return self.stoichiometry_vector
 
-    def get_rate(self, C, T):
+    def get_rate(self, C, T, tracker):
         Cg = C[self.gas_index]
         Cl = C[self.liquid_index]
         H = self.H0cp * np.exp(self.Hsol * (1/T - 1/T0))
@@ -74,8 +74,8 @@ class SystemGasLiquidTransfers:
         gl_transfers = np.vstack(transfer.get_vector() for transfer in self.transfers) 
         return np.vstack([gl_transfers, self.gas_outflow_vector])
 
-    def get_rates(self, C, T):
-        equilibration_rate = np.hstack(transfer.get_rate(C, T) for transfer in self.transfers) * self.vliq / self.vgas
+    def get_rates(self, C, T, tracker):
+        equilibration_rate = np.hstack(transfer.get_rate(C, T, tracker) for transfer in self.transfers) * self.vliq / self.vgas
         # should also account for water vapour pressure. Ignored for the moment
         total_gas_pressure = sum(transfer.get_partial_pressure(C) for transfer in self.transfers)
         gas_outflow_rate = np.array([self.alpha * (total_gas_pressure - self.headspace_pressure)]) 

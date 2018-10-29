@@ -203,7 +203,7 @@ def get_system_glt(input_file, glt_dict, chems_list):
     alpha = gl_info.get("alpha", 1)
     return SystemGasLiquidTransfers(chems_list, glts, vliq, vgas, headspace_pressure, alpha)
 
-def get_simulation(input_file, logger=None):
+def get_simulation(input_file, logger=None, progress_tracker=None):
     # get system's temperature
     # or assume it is the standard temperature if unspecified
     T = input_file.get("T", T0)
@@ -224,11 +224,12 @@ def get_simulation(input_file, logger=None):
     # instanciate the community
     community = Community(populations)
 
-    # pass a logger if defined
+    # pass logger and tracker if they are defined
+    params = dict()
     if logger:
-        params = {"logger": logger}
-    else:
-        params = {}
+        params["logger"] = logger
+    if progress_tracker:
+        params["progress_tracker"] = progress_tracker
 
     return Simulation(chems_list, nesting, system_equilibrator, system_glt, community, y0, T, D, **params)
 

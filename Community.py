@@ -4,8 +4,8 @@ class Community:
     def __init__(self, populations):
         self.populations = populations
 
-    def get_derivatives(self, C, T):
-        return np.vstack(population.get_derivatives(C, T) for population in self.populations)
+    def get_derivatives(self, C, T, tracker):
+        return np.vstack(population.get_derivatives(C, T, tracker) for population in self.populations)
 
     def get_population_specific_variables_indexes(self):
         '''Asks all populations for their specific variables' indexes.

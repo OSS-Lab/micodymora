@@ -23,7 +23,7 @@ class GrowthModel(abc.ABC):
         super().__init__()
 
     @abc.abstractmethod
-    def get_derivatives(self, expanded_y, T):
+    def get_derivatives(self, expanded_y, T, tracker):
         pass
 
     @abc.abstractmethod
@@ -172,7 +172,7 @@ class ThermoAllocationModel(GrowthModel):
         '''Maintenance as implemented by Tijhuis et al., 1993 (kJ.C-molX-1.hour-1)'''
         return -4.5 * np.exp(69e3 / Rkj * (1 / T - 1 / T0))
 
-    def get_derivatives(self, y, T):
+    def get_derivatives(self, y, T, tracker):
         scaled_phis = self.scaled_phi(y)
         # get the vector of derivatives, without anabolism
         rcat = self.rcat(y, T)
@@ -184,6 +184,7 @@ class ThermoAllocationModel(GrowthModel):
         backward_atp_rate = X * (self.maintenance(T) / self.xaa / self.dGatp
                                  + scaled_phis["r"] * self.vt * (self.nu_atp_tr + self.nu_atp_an))
         katp = forward_atp_rate / backward_atp_rate
+        tracker.update_log(f"{self.population_name}: {katp:.2e}")
         if katp:
             ATP = self.iap / (1 + 1 / katp)
         else:

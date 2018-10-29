@@ -25,9 +25,47 @@ class BlankLogger(AbstractLogger):
     def do_log(self, simulation, time, nested_y, expanded_y):
         pass
 
+class AbstractProgressTracker(abc.ABC):
+    '''Define the interface that an instance tracking simulation
+    progress in real time should have'''
+    @abc.abstractmethod
+    def __init__(self):
+        pass
+
+    @abc.abstractmethod
+    def set_total_time(self, total_time):
+        pass
+
+    @abc.abstractmethod
+    def update_progress(self, time):
+        '''
+        * time: current simulation time
+        '''
+        pass
+
+    @abc.abstractmethod
+    def update_log(self, message):
+        '''
+        * message: string
+        '''
+        pass
+
+class BlankProgressTracker(AbstractProgressTracker):
+    def __init__(self):
+        pass
+
+    def set_total_time(self, total_time):
+        self.total_time = total_time
+
+    def update_progress(self, time):
+        pass
+
+    def update_log(self, message):
+        pass
+
 class Simulation:
     def __init__(self, chems_list, nesting, system_equilibrator, system_glt, community,
-    initial_concentrations, T, D, logger=BlankLogger()):
+    initial_concentrations, T, D, logger=BlankLogger(), progress_tracker=BlankProgressTracker()):
         '''
         * chems_list: list of the name of the chemical species involved in the
         simulation, in the same order as in the expanded concentration vector
@@ -63,6 +101,8 @@ class Simulation:
             self.D_vector[index] = 0
         assert issubclass(type(logger), AbstractLogger)
         self.logger = logger
+        assert issubclass(type(progress_tracker), AbstractProgressTracker)
+        self.progress_tracker = progress_tracker
 
     def equilibrate(self, y):
         '''Takes an aggregated concentration vector, returns an expanded
@@ -89,12 +129,12 @@ class Simulation:
         y = self.concentrations_pretreatment(y)
         expanded_y = np.array(self.equilibrate(y))
         # derivatives caused by biological reactions
-        bio_derivatives = self.community.get_derivatives(expanded_y, self.T)
+        bio_derivatives = self.community.get_derivatives(expanded_y, self.T, self.progress_tracker)
         dy_dt_bio = np.sum(bio_derivatives, axis=0)
         # derivatives caused by the chemostat
         dy_dt_chemo = self.D_vector * (self.input - expanded_y)
         # derivatives caused by gas-liquid transfers
-        glt_rates = self.system_glt.get_rates(expanded_y, self.T)
+        glt_rates = self.system_glt.get_rates(expanded_y, self.T, self.progress_tracker)
         glt_matrix = self.system_glt.get_matrix()
         glt_rate_matrix = np.diag(glt_rates) @ glt_matrix
         dy_dt_glt = np.sum(glt_rate_matrix, axis=0)
@@ -107,6 +147,7 @@ class Simulation:
         solver = ode(self.f)
         solver.set_integrator("lsoda")
         solver.set_initial_value(self.y0)
+        self.progress_tracker.set_total_time(time)
 
         ts = []
         ys = []
@@ -117,6 +158,7 @@ class Simulation:
             ts.append(solver.t)
             ys.append(expanded_y)
             self.logger.do_log(self, solver.t, solver.y, expanded_y)
+            self.progress_tracker.update_progress(solver.t)
             waitbar = spinner(int(solver.t), int(time))
             print("\rintegrating: {} hour ".format(waitbar), end="")
         print()
