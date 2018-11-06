@@ -27,6 +27,9 @@ HPO4-2,HPO4-2,-1093.6,Noor et al. 2013
 PO4-3,PO4-3,-1020.0,Noor et al. 2013
 Na+,Na+,0,Guess
 K+,K+,0,Guess
+Mg+2,Mg+2,0,Guess
+Ca+2,Ca+2,0,Guess
+Cl-,Cl-,0,Guess
 Lac(-),C3H5O3-,-511.3,Noor et al. 2013
 Lac,C3H6O3,-532.9,Noor et al. 2013
 Ac(-),C2H3O2-,-367.9,Noor et al. 2013

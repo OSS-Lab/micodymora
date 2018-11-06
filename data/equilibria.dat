@@ -4,3 +4,4 @@ lactate: Lac Lac(-): 3.78
 phosphate: H3PO4 H2PO4- HPO4-2 PO4-3: 1.79 6.95 12.89
 carbonate: CO2(aq) HCO3- CO3-2: 13.73 3.22
 hydrosulfide: H2S(aq) HS-: 7.00
+ammonium: NH4+ NH3(aq): 9.25
