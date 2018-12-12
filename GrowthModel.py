@@ -147,6 +147,7 @@ class ThermoAllocationModel(GrowthModel):
         total_atp_flow = sum(cat_atp_flows)
         if total_atp_flow:
             ideal_phi_cats = cat_atp_flows / total_atp_flow
+            #tracker.update_log("\n".join("{}: {:.2e}".format(pathway.name, phi_star) for pathway, phi_star in zip(self.pathways, ideal_phi_cats)))
             for population, ideal_phi_cat in zip(self.pathways, ideal_phi_cats):
                 phi_cat = y[self.phi_cat[population.name]]
                 derivatives_vector[self.phi_cat[population.name]] = self.k * (ideal_phi_cat - phi_cat)
@@ -191,8 +192,30 @@ class ThermoAllocationModel(GrowthModel):
         # compute the growth rate
         mu = scaled_phis["r"] * X * self.vt * ATP / (self.Katp + ATP)
         derivatives[self.X] = mu
+        # summarize energy flows
+        summary = """catabolic ATP flows:
+{}
+
+ATP sinks:
+* maintenance: {:.2e}
+* anabolism: {:.2e}
+
+ATP/ADP: {:.2e} 
+
+growth rate: {:.2e}""".format("\n".join(f"* {pathway.name}: {flow/X:.2e}" for pathway, flow in zip(self.pathways, cat_atp_flows)),
+                            self.maintenance(T) / self.xaa / self.dGatp,
+                            scaled_phis["r"] * self.vt * (self.nu_atp_tr + self.nu_atp_an),
+                            katp,
+                            mu)
+        tracker.update_log(summary)
         # add proteome derivatives
         derivatives += self.proteome_derivatives(y, T, cat_atp_flows, katp, tracker)
+        # print the rarest resources
+        #rarity_pairs = ((name, dy / y) for name, y, dy in zip(self.chems_list, y, derivatives) if dy < 0)
+        #sorted_pairs = sorted(rarity_pairs, key=lambda pair: abs(pair[1]), reverse=True)
+        #rarest = "\n".join(f"{name:10.10}: {dy:.2e}" for name, dy in sorted_pairs[:5])
+        #tracker.update_log(rarest)
+        #tracker.update_log(f"pH: {-np.log10(y[self.chems_list.index('H+')]):.2f}")
         return derivatives
 
 class RateFunction(abc.ABC):
