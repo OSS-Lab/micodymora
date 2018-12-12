@@ -130,7 +130,9 @@ class ThermoAllocationModel(GrowthModel):
                for name, phi_cat 
                in self.phi_cat.items()}
         other = {"x": self.phi_x, "r": max(0, y[self.phi_r]) / total_phi * (1 - self.phi_x - self.phi_an)}
-        return {**other, **cat}
+        scaled_phi_dict = other
+        scaled_phi_dict.update(cat)
+        return scaled_phi_dict
 
     def proteome_derivatives(self, y, T, cat_atp_flows, katp, tracker):
         '''Proteome reallocation strategy
@@ -178,7 +180,7 @@ class ThermoAllocationModel(GrowthModel):
         # get the vector of derivatives, without anabolism
         rcat = self.rcat(y, T, tracker)
         X = y[self.X]
-        derivatives = rcat @ self.reaction_matrix
+        derivatives = np.matmul(rcat, self.reaction_matrix)
         # compute the ATP concentration
         cat_atp_flows = rcat * self.nu_atp_cat
         forward_atp_rate = sum(cat_atp_flows)
@@ -202,7 +204,7 @@ ATP sinks:
 
 ATP/ADP: {:.2e} 
 
-growth rate: {:.2e}""".format("\n".join(f"* {pathway.name}: {flow/X:.2e}" for pathway, flow in zip(self.pathways, cat_atp_flows)),
+growth rate: {:.2e}""".format("\n".join("* {}: {:.2e}".format(pathway.name, flow/X) for pathway, flow in zip(self.pathways, cat_atp_flows)),
                             self.maintenance(T) / self.xaa / self.dGatp,
                             scaled_phis["r"] * self.vt * (self.nu_atp_tr + self.nu_atp_an),
                             katp,

@@ -142,7 +142,7 @@ class Simulation:
         # derivatives caused by gas-liquid transfers
         glt_rates = self.system_glt.get_rates(expanded_y, self.T, self.progress_tracker)
         glt_matrix = self.system_glt.get_matrix()
-        glt_rate_matrix = np.diag(glt_rates) @ glt_matrix
+        glt_rate_matrix = np.matmul(np.diag(glt_rates), glt_matrix)
         dy_dt_glt = np.sum(glt_rate_matrix, axis=0)
 
         dy_dt = dy_dt_bio + dy_dt_chemo + dy_dt_glt
