@@ -220,6 +220,66 @@ growth rate: {:.2e}""".format("\n".join("* {}: {:.2e}".format(pathway.name, flow
         #tracker.update_log(f"pH: {-np.log10(y[self.chems_list.index('H+')]):.2f}")
         return derivatives
 
+class SimpleGrowthModel(GrowthModel):
+    """Implementation of a purposefully simple multi-pathway growth model.
+    The rate of a pathway i is `rcat_i = [X] * phi_cat_i * FD * FT`
+    The resulting ATP flux is `J_atp = sum(rcat_i * m_i)`
+    The resulting growth rate is `mu = J_atp * Yatp`
+    For simplicity purpose, FD is multiplicative Monod kinetics and FT is Jin
+    and Bethke's factor.
+    
+    The following parameters must be defined for the population;
+    - X0: initial biomass concentration (molaa.L-1)
+    - Yatp: biomass yield on ATP (molaa.molATP-1)
+    - dGatp: Gibbs energy differential stored in ATP (kJ.molATP-1)
+    
+    The following parameters must be defined for each pathway;
+    - vmax: maximum catalytic rate
+    - Km: affinity for substrate (dictionary)
+    - phi cat: fraction of total proteome being enzymes of the pathway (constant)
+    - m: number of ATP molecules produced per turnover
+    """
+    def __init__(self, population_name, chems_list, reactions, params):
+        self.population_name = population_name
+        self.chems_list = chems_list
+        self.pathways = reactions
+        # take the specific parameters of the model
+        self.X0 = params["X0"] # initial biomass concentration
+        self.Yatp = params["Yatp"] # biomass yield on ATP
+        # create the specific chems
+        self.specific_chems = ["{} total biomass".format(self.population_name)]
+        self.affected_by_dilution = [True]
+        # prepare the rate formula for each pathways
+        self.FD = _rates_dict["MM"](chems_list, params["fd"], params)
+        self.FT = _rates_dict["JinBethkeFT"](chems_list, params["ft"], params)
+        for pathway in self.pathways:
+            self.FD.prepare(pathway)
+            self.FT.prepare(pathway)
+            assert "phi cat" in pathway.parameters
+            assert "m" in pathway.parameters
+
+    def register_chems(self, indexes):
+        self.X = indexes[0] # chem 1 is for total biomass
+        for pathway in self.pathways:
+            pathway.update_chems_list(self.chems_list)
+        # now the reaction matrix of the pathways can be stored
+        self.reaction_matrix = np.vstack(pathway.stoichiometry_vector
+                                         for pathway
+                                         in self.pathways)
+
+    def set_initial_concentrations(self, y0):
+        y0[self.X] = self.X0
+        return y0
+
+    def get_derivatives(self, y, T, tracker):
+        X = y[self.X]
+        rcat = np.hstack(X * pathway.parameters["phi cat"] * self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
+                         for pathway in self.pathways)
+        derivatives = np.matmul(rcat, self.reaction_matrix)
+        atp_flux = sum(r * pathway.parameters["m"] for r, pathway in zip(rcat, self.pathways))
+        derivatives[self.X] = atp_flux * self.Yatp
+        return derivatives
+
 class RateFunction(abc.ABC):
     '''Classes inheriting from this abstraction represent functions computing
     part or all of the rate of a chemical reaction.
@@ -385,4 +445,5 @@ _rates_dict = {"MM": MM_kinetics,
                "JinBethkeFT": JinBethkeFT,
                "LaRowe2012FT": LaRowe2012FT}
 
-growth_models_dict = {"ThermoAllocationModel": ThermoAllocationModel}
+growth_models_dict = {"ThermoAllocationModel": ThermoAllocationModel,
+                      "SimpleGrowthModel": SimpleGrowthModel}
