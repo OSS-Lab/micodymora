@@ -122,11 +122,15 @@ def outline_systems_chemistry(input_file):
 def get_catabolic_reactions(input_file, chems_dict, reactions_dict):
     for name, population in input_file.get("community").items():
         reactions = list()
-        for reaction_string in population.get("pathways"):
-            if "-->" in reaction_string:
-                reaction = Reaction.from_string(chems_dict, reaction_string)
+        for reaction_name, parameters in population.get("pathways").items():
+            if reaction_name in reactions_dict:
+                reaction = reactions_dict[reaction_name]
             else:
-                reaction = reactions_dict[reaction_string]
+                formula = parameters.get("formula")
+                if formula:
+                    reaction = Reaction.from_string(chems_dict, formula, name=reaction_name)
+                else:
+                    raise ValueError("unknown reaction \"{}\" and no formula provided".format(reaction_name))
             reactions.append(reaction)
     return reactions
 
