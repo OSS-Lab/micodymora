@@ -117,7 +117,7 @@ def outline_systems_chemistry(input_file):
     # instanciate the populations and add their specific variables to the chems list
     chems_list, nesting, chems_dict, populations = register_biomass(input_file, chems_dict, reactions_dict, preliminary_chems_list, nesting)
 
-    return chems_list, nesting, equilibria, reactions_dict, chems_dict, glt_dict, populations
+    return chems_list, nesting, equilibria, chems_dict, glt_dict, populations
 
 def get_catabolic_reactions(input_file, chems_dict, reactions_dict):
     for name, population in input_file.get("community").items():
@@ -128,6 +128,7 @@ def get_catabolic_reactions(input_file, chems_dict, reactions_dict):
             else:
                 formula = parameters.get("formula")
                 if formula:
+                    # first look for population-specific variables and create the corresponding chems
                     reaction = Reaction.from_string(chems_dict, formula, name=reaction_name)
                 else:
                     raise ValueError("unknown reaction \"{}\" and no formula provided".format(reaction_name))
@@ -143,7 +144,6 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
         # firstly they are created but they lack the knowledge
         # of the index of their specific variables (biomass, atp...) as it is
         # not yet recorded in the chems list
-        # FIXME: maybe this part and get_catabolic_reactions could be factorized
         parameters = population.get("growth model").get("parameters")
         reactions = list()
         for reaction_string, reaction_parameters in population.get("pathways").items():
@@ -215,7 +215,7 @@ def get_simulation(input_file, logger=None, progress_tracker=None):
     D = input_file.get("D", 0)
     # determine the list of chemical species which are involved in the
     # simulation
-    chems_list, nesting, equilibria, reactions_dict, chems_dict, glt_dict, populations = outline_systems_chemistry(input_file)
+    chems_list, nesting, equilibria, chems_dict, glt_dict, populations = outline_systems_chemistry(input_file)
     y0 = get_initial_concentrations(input_file, chems_list, nesting, populations)
 
     # instanciate the equilibrator
