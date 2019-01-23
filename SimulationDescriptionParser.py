@@ -17,12 +17,15 @@ from micodymora.GrowthModel import growth_models_dict
 from copy import copy
 import numpy as np
 import os
+import re
 
 module_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data")
 default_chems_description_path = os.path.join(module_path, "chems.csv")
 default_reactions_description_path = os.path.join(module_path, "reactions.dat")
 default_equilibria_description_path = os.path.join(module_path, "equilibria.dat")
 default_glt_description_path = os.path.join(module_path, "gas_liquid_transfer.dat")
+
+_population_specific_chems_pat = re.compile("\{(.+)\}")
 
 class OverlappingEquilibriaException(Exception):
     '''When the system's equilibria are defined, a single chemical species
@@ -120,6 +123,9 @@ def outline_systems_chemistry(input_file):
     return chems_list, nesting, equilibria, chems_dict, glt_dict, populations
 
 def get_catabolic_reactions(input_file, chems_dict, reactions_dict):
+    '''This function collects the reactions in the config file in order to list
+    the chems involved in the simulation. 
+    '''
     for name, population in input_file.get("community").items():
         reactions = list()
         for reaction_name, parameters in population.get("pathways").items():
@@ -128,57 +134,97 @@ def get_catabolic_reactions(input_file, chems_dict, reactions_dict):
             else:
                 formula = parameters.get("formula")
                 if formula:
-                    # first look for population-specific variables and create the corresponding chems
+                    # first look for population-specific variables and replace them by water
+                    # because they should not be accounted for right now
+                    formula = re.sub(_population_specific_chems_pat, "H2O", formula)
                     reaction = Reaction.from_string(chems_dict, formula, name=reaction_name)
                 else:
                     raise ValueError("unknown reaction \"{}\" and no formula provided".format(reaction_name))
             reactions.append(reaction)
     return reactions
 
+# This function parses the populations definitions in order to create the
+# GrowthModel instances (which actually represent the populations).
 def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting):
-    '''
-    '''
     population_instances = list()
-    for name, population in input_file.get("community").items():
-        # create the growth model instances for each population
-        # firstly they are created but they lack the knowledge
-        # of the index of their specific variables (biomass, atp...) as it is
-        # not yet recorded in the chems list
+    specific_reactions = dict() # {population_name: {reaction_name: {formula: str, parameters: list}}}
+    for population_name, population in input_file.get("community").items():
         parameters = population.get("growth model").get("parameters")
-        reactions = list()
-        for reaction_string, reaction_parameters in population.get("pathways").items():
-            if "-->" in reaction_string:
-                reaction = Reaction.from_string(chems_dict, reaction_string)
+        generic_reactions = list()
+        specific_reactions[population_name] = dict()
+        # The reactions catalyzed by the population are scanned here.
+        # Some are "generic", which means they only involve chems defined
+        # a priori in the chems dictionary (like SO4-2, H2(aq) etc), while
+        # other reactions are "specific", which mean they involve
+        # population-specific chems, such as the population's biomass etc.
+        # The specific reactions are set aside for the moment since the
+        # specific chems are not registered yet. The population is instanciated
+        # and given its generic reactions, then its specific chems are created,
+        # plugged into the specific reactions, and the specific reactions given
+        # to the population
+        for reaction_name, reaction_parameters in population.get("pathways").items():
+            is_a_generic_formula = True
+            if reaction_name in reactions_dict:
+                reaction = reactions_dict[reaction_name]
             else:
-                reaction = reactions_dict[reaction_string]
-            simbioreaction = reaction.new_SimBioReaction(chems_list, reaction_parameters)
-            reactions.append(simbioreaction)
+                formula = reaction_parameters.get("formula")
+                if formula:
+                    if _population_specific_chems_pat.findall(formula):
+                        # If the formula refers to population-specific chems
+                        # (such as the population's biomass) it cannot be
+                        # instanciated right now
+                        is_a_generic_formula = False
+                        specific_reactions[population_name][reaction_name] = {"formula": formula,
+                                                                              "parameters": reaction_parameters}
+                    else:
+                        reaction = Reaction.from_string(chems_dict, formula, name=reaction_name)
+                else:
+                    raise ValueError("unknown reaction \"{}\" and no formula provided".format(reaction_name))
+            if is_a_generic_formula:
+                simbioreaction = reaction.new_SimBioReaction(chems_list, reaction_parameters)
+                generic_reactions.append(simbioreaction)
         # instanciate the population
         growth_model_name = population.get("growth model").get("name")
-        growth_model = growth_models_dict[growth_model_name](name, chems_list, reactions, parameters)
-        population_instances.append(growth_model)
+        growth_model = growth_models_dict[growth_model_name](population_name, chems_list, generic_reactions, parameters)
         # add the specific chems of the population to chems list, chems dict and nestings list
-        chems_list.extend(growth_model.specific_chems)
-        for chem in growth_model.specific_chems:
+        # growth_model is expected to have a `specific_chems` attribute, which has the structure;
+        # {local_name: {name: global_name, template: template}}
+        # - local_name is the name used in specific reactions formulas (eg: "biomass")
+        # - global_name is the name of the chem in the simulation (eg: "Dv total biomass")
+        # - template is the name of the chem from chems_dict to use as a template
+        # (eg: Biomass(Hoover)). template can be set to None.
+        specific_chems = dict() # local name -> global name mapping for specific chems
+        indexes = dict() # local name -> index in chems_list
+        for chem_name, chem_info in growth_model.specific_chems.items():
+            if chem_info["template"]:
+                new_chem = chems_dict[chem_info["template"]].copy()
+            else:
+                new_chem = Chem(chem_name)
+            if chem_info["name"] in chems_dict:
+                raise ValueError("Specific chem \"{}\" of population \"{}\" overwrites already known chem".format(chem_info["name"], population_name))
+            else:
+                chems_dict[chem_info["name"]] = new_chem
             nesting.append(nesting[-1] + 1)
-            chems_dict[chem] = Chem(chem)
-
-    # give the populations the knowledge of the index of their specific variables
+            chems_list.append(chem_info["name"])
+            indexes[chem_name] = len(chems_list) - 1
+            specific_chems[chem_name] = chem_info["name"]
+        population_instances.append(growth_model)
+    # Now all populations have been scanned, the chems_list is complete
+    # Give to the knowledge of the chems_list to specific reactions and populations
     for population in population_instances:
-        specific_chems_indexes = [chems_list.index(chem) for chem in population.specific_chems]
-        population.register_chems(specific_chems_indexes)
+        population_specific_reactions = list()
+        for reaction_name, reaction_info in specific_reactions[population.population_name].items():
+            # convert the local names in the specific reactions formulas into their global counterpart
+            # (eg: convert "{biomass}" to "Dv_biomass" in the formula string)
+            specific_chems_dict = {local_name: infos["name"] for local_name, infos in population.specific_chems.items()}
+            formula = reaction_info["formula"].format(**specific_chems)
+            reaction = Reaction.from_string(chems_dict, formula, name=reaction_name)
+            reaction = reaction.new_SimBioReaction(chems_list, reaction_info["parameters"])
+            population_specific_reactions.append(reaction)
+        population.register_chems(indexes, chems_list, population_specific_reactions)
 
-    # record the growth-model-specific chems
-#    for chem in growth_model.specific_chems:
-#        nesting.append(nesting[-1] + 1)
-#        specific_chems_indexes.append(len(chems_list) - 1)
-#        chems_dict[chem] = Chem(chem)
-#    growth_model.register_chems(specific_chems_indexes)
-
-        # now the populations have the knowledge of the index of their specific
-        # variables
     return chems_list, nesting, chems_dict, population_instances
-
+        
 def get_initial_concentrations(input_file, chems_list, nesting, populations):
     '''Return the vector of initial concentrations in aggregated format.'''
     initial_concentrations = np.zeros(len(chems_list)) + np.finfo(float).eps

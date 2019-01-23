@@ -12,16 +12,14 @@ class Community:
         Returns it as a list'''
         indexes = list()
         for population in self.populations:
-            for chem in population.specific_chems:
-                indexes.append(population.chems_list.index(chem))
+            for chem_info in population.specific_chems.values():
+                indexes.append(population.chems_list.index(chem_info["name"]))
         return indexes
 
     def get_index_of_chems_unaffected_by_dilution(self):
         indexes = list()
         for population in self.populations:
-            for chem, is_affected in zip(population.specific_chems, population.affected_by_dilution):
-                if not is_affected:
-                    indexes.append(population.chems_list.index(chem))
+                    indexes.extend(population.get_index_of_specific_chems_unaffected_by_dilution())
         return indexes
 
     def pretty_str(self):

@@ -5,9 +5,6 @@ import numpy as np
 import functools
 import operator
 
-# TODO: test this module
-# TODO: find a way to build those structures with the parser
-
 class GrowthModel(abc.ABC):
     '''Classes inheriting from GrowthModel represent a microbial population,
     and define its growth kinetics.
@@ -25,16 +22,26 @@ class GrowthModel(abc.ABC):
     @abc.abstractmethod
     def get_derivatives(self, expanded_y, T, tracker):
         pass
+    
+    @abc.abstractmethod
+    def get_index_of_specific_chems_unaffected_by_dilution(self):
+        pass
 
     @abc.abstractmethod
-    def register_chems(self, indexes):
+    def register_chems(self, indexes, chems_list, specific_reactions):
         '''This message is supposed to be sent by the configuration parser,
         during the building of the simulation. At that point, the specific
         chems introduced by the growth model have been added to the
-        concentration vector of the simulation, so the parser sends their
-        index back to the GrowthModel instance through this message
-        * indexes: list of the index of each population-specific chem in
-        the concentration vector of the simulation.
+        concentration vector of the simulation, and the reactions involving
+        those chems have been created by the parser, so the parser sends the
+        specific chems' indexes and the specific reactions back to the GrowthModel
+        instance through this message
+        * indexes: dictionary mapping a chems' "role" name (eg: "biomass")
+        to its index in the chems list of the simulation
+        * chems_list: the complete chems list of the simulation, including the
+        specific chems of all the species (list of strings)
+        * specific_reactions: list of SimBioReaction instances containing
+        the reactions involving specific chems
         The growth model instance is not supposed to be "mature" before
         receiving this message.'''
         pass
@@ -89,23 +96,32 @@ class ThermoAllocationModel(GrowthModel):
         # specific_chems is an attribute made for the configuration parser,
         # to tell it what chems to create for the specific needs of the
         # population. 
-        self.specific_chems = ["{} total biomass".format(self.population_name),
-                               "{} phi r".format(self.population_name)]
-        self.specific_chems += ["{} phi cat {}".format(self.population_name, pathway.name)
-                                for pathway
-                                in self.pathways]
+        self.specific_chems = {"biomass": {"name": "{}_total_biomass".format(self.population_name),
+                                           "template": None},
+                               "phi r": {"name": "{}_phi_r".format(self.population_name),
+                                         "template": None}}
+        for pathway in self.pathways:
+            self.specific_chems["phi cat {}".format(pathway.name)] = {"name": "{}_phi_cat_{}".format(self.population_name, pathway.name),
+                                                                      "template": None}
         # only total proteome and atp should be subjected to dilution
-        self.affected_by_dilution = [False for chem in self.specific_chems]
-        self.affected_by_dilution[0] = True # total proteome
+        self.affected_by_dilution = ["biomass"]
 
-    def register_chems(self, indexes):
+    def get_index_of_specific_chems_unaffected_by_dilution(self):
+        return [self.chems_list.index(chem_info["name"])
+                for chem_kind, chem_info
+                in self.specific_chems.items()
+                if chem_kind not in self.affected_by_dilution]
+
+    def register_chems(self, indexes, chems_list, specific_reactions):
         # The type of chem to which the indexes correspond is set by the order
         # of the chems in self.specific_chems
-        self.X = indexes[0] # chem 1 is for total biomass
-        self.phi_r = indexes[1] # chem 2 is for ribosome fraction
+        self.X = indexes["biomass"]
+        self.phi_r = indexes["phi r"]
         # following chems are for pathway-specific enzyme fractions, in the same order
         # as in self.pathway
-        self.phi_cat = {pathway.name: phi for pathway, phi in zip(self.pathways, indexes[2:])}
+        self.phi_cat = {chem_kind.replace("phi cat ", ""): index
+                        for chem_kind, index
+                        in indexes.items() if chem_kind.startswith("phi cat")}
         # update the stoichiometry vector of the reactions
         for pathway in self.pathways:
             pathway.update_chems_list(self.chems_list)
@@ -126,6 +142,7 @@ class ThermoAllocationModel(GrowthModel):
         the proteome, scaled to 1'''
         # total phi is without phi x
         total_phi = y[self.phi_r] + sum(y[phi_cat] for phi_cat in self.phi_cat.values())
+        print(self.phi_cat.items())
         cat = {name: y[phi_cat] / total_phi * (1 - self.phi_x - self.phi_an)
                for name, phi_cat 
                in self.phi_cat.items()}
@@ -278,6 +295,98 @@ class SimpleGrowthModel(GrowthModel):
         derivatives = np.matmul(rcat, self.reaction_matrix)
         atp_flux = sum(r * pathway.parameters["m"] for r, pathway in zip(rcat, self.pathways))
         derivatives[self.X] = atp_flux * self.Yatp
+        return derivatives
+
+class SimpleGrowthModel2(GrowthModel):
+    """Implementation of a purposefully simple multi-pathway growth model.
+    The rate of a pathway i is `rcat_i = [X] * FD * FT`
+    For simplicity purpose, FD is multiplicative Monod kinetics and FT is Jin
+    and Bethke's factor.
+    
+    The following parameters must be defined for the population;
+    - X0: initial biomass concentration (molaa.L-1)
+    - anabolism: name of the population's reaction which is the anabolic reaction
+    - chems dict path: (optional) path for the chems dict to be used when
+      interpreting the anabolic reaction
+    - Ym: true yield
+    - Mdc: Stahl's Mdc parameter
+    - decay: biomass decay rate (h-1)
+    - biomass: the specie to be considered as biomass in the anabolic equation
+    
+    The following parameters must be defined for each pathway;
+    - vmax: maximum catalytic rate
+    - Km: affinity for substrate (dictionary)
+    """
+    def __init__(self, population_name, chems_list, reactions, params):
+        self.population_name = population_name
+        self.chems_list = chems_list
+        # take the specific parameters of the model
+        self.X0 = params["X0"] # initial biomass concentration
+        self.Mdc = params["Mdc"]
+        self.decay = params["decay"]
+        self.biomass = params["biomass"]
+        self.anabolism = params["anabolism"]
+        # all the reactions which are not the anabolic reaction are considered
+        # to be catabolic pathways
+        self.pathways = reactions
+        # create the specific chems
+        self.specific_chems = {"biomass": {"name": "{}_biomass".format(self.population_name),
+                                           "template": self.biomass}}
+        self.affected_by_dilution = ["biomass"]
+        # prepare the rate formula for each pathways
+        self.FD = _rates_dict["MM"](chems_list, params["fd"], params)
+        self.FT = _rates_dict["JinBethkeFT"](chems_list, params["ft"], params)
+        for pathway in self.pathways:
+            self.FD.prepare(pathway)
+            self.FT.prepare(pathway)
+            assert "phi cat" in pathway.parameters
+            assert "m" in pathway.parameters
+
+    def register_chems(self, indexes, chems_list, specific_reactions):
+        # update the chems list
+        self.chems_list = chems_list
+        self.X = indexes["biomass"]
+        # store the anabolic reaction, apart from the catabolic pathways
+        self.anabolism = next(reaction for reaction in specific_reactions if reaction.name == self.anabolism)
+        # update the stoichiometry vector of the reactions
+        for pathway in self.pathways:
+            pathway.update_chems_list(self.chems_list)
+        # the anabolic reaction can now be converted to 
+        self.anabolism.update_chems_list(self.chems_list)
+        # store the catabolism matrix now we know the length of the vectors
+        self.reaction_matrix = np.vstack(pathway.stoichiometry_vector
+                                         for pathway
+                                         in self.pathways)
+
+    def get_index_of_specific_chems_unaffected_by_dilution(self):
+        return [self.chems_list.index(chem_info["name"])
+                for chem_kind, chem_info
+                in self.specific_chems.items()
+                if chem_kind not in self.affected_by_dilution]
+
+    def add_reaction(self, reaction):
+        self.pathways.append(reaction)
+
+    def set_initial_concentrations(self, y0):
+        y0[self.X] = self.X0
+        return y0
+
+    def get_stoichiometry(self, pathway, y, T, tracker):
+        Ym = pathway.parameters["Ym"]
+        Mdc = self.Mdc
+        Rc = self.anabolism.stoichiometry_vector
+        Re = pathway.stoichiometry_vector
+        return Ym * Mdc * Rc + (1 - Ym * Mdc) * Re
+
+    def get_derivatives(self, y, T, tracker):
+        X = y[self.X]
+        rcat = np.hstack(X * pathway.parameters["phi cat"] * self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
+                         for pathway in self.pathways)
+        tracker.update_log(rcat)
+        # each pathway is associated with a anabolism and catabolism stoichiometry
+        R = [self.get_stoichiometry(pathway, y, T, tracker) for pathway in self.pathways]
+        derivatives = np.sum(stoech * rate for stoech, rate in zip(R, rcat))
+        derivatives[self.X] -= self.decay * X
         return derivatives
 
 class RateFunction(abc.ABC):
@@ -446,4 +555,6 @@ _rates_dict = {"MM": MM_kinetics,
                "LaRowe2012FT": LaRowe2012FT}
 
 growth_models_dict = {"ThermoAllocationModel": ThermoAllocationModel,
-                      "SimpleGrowthModel": SimpleGrowthModel}
+                      "SimpleGrowthModel": SimpleGrowthModel,
+                      "SimpleGrowthModel2": SimpleGrowthModel2,
+                      }

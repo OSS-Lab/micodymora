@@ -220,15 +220,39 @@ class SimBioReaction(Reaction):
         self.update_chems_list(chems_list) # the stoichiometry vector is set here
         self.parameters = parameters
 
-    def update_chems_list(self, new_chems_list):
-        '''Change the chems list and recompute the stoichiometry vector accordingly'''
-        self.chems_list = new_chems_list
+    def update_stoichiometry_vector(self):
+        '''The stoichiometry vector is stored by the instance as an attribute,
+        since it is not expected to be modified after instanciation. However it
+        may happen anyway. This function exists to update the stoichiometry
+        vector after the reaction's stoichiometry has been modified'''
         self.stoichiometry_vector = np.zeros(len(self.chems_list))
         for reagent, stoichiometry in self.reagents.items():
             # if the reaction involves a reagent which is purposefully not
             # included in the simulation (eg: water), ignore it
             if reagent.name in self.chems_list:
                 self.stoichiometry_vector[self.chems_list.index(reagent.name)] = stoichiometry
+
+    def update_chems_list(self, new_chems_list):
+        '''Change the chems list and recompute the stoichiometry vector accordingly'''
+        self.chems_list = new_chems_list
+        self.update_stoichiometry_vector()
+
+    def set_stoichiometry_by_index(self, index, value, chem=None):
+        '''Set to `value` the stoichiometric coefficient of the reagent whose
+        index is `index` according to the reactions's chems list.
+        If the reagent is not part of the reaction, a chem instance has to
+        be created for it. The `chem` argument provides the Chem instance to use'''
+        if self.chems_list[index] in [r.name for r in self.reagents]:
+            reagent = next(reagent for reagent in self.reagents if reagent.name == self.chems_list[index])
+            self.reagents[reagent] = value
+        else:
+            if chem:
+                self.reagents[chem] = value
+            else:
+                raise ValueError("attempt to set the value of the reagent of index {} in reaction '{}' "
+                                 "while it is not initially part of the reaction and no Chem instance "
+                                 "has been provided for it".format(index, self.name))
+        self.update_stoichiometry_vector()
 
     def lnQ(self, C):
         '''Natural logarithm of the mass action ratio of the reaction.
