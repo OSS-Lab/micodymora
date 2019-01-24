@@ -15,16 +15,42 @@ class GrowthModel(abc.ABC):
     chems of the population are affected by the chemostat's dilution rate or not
     '''
     def __init__(self, population_name, chems_list, reactions, params):
+        '''
+        * population_name: name of the population (string)
+        * chems_list: list of the name of the chems being part of the simulation
+        (list of strings)
+        (NOTE: at the moment of the instanciation of the GrowthModel, this list
+        of chems does not contain the chems specific to the population, such
+        as its biomass. They will be added later, through `register_chems`)
+        * reactions: list of reactions catalyzed by the population (list of
+        Reaction.SimBioReaction instances)
+        (NOTE: at the moment of the instanciation of the GrowthModel, this
+        list does not contain the reactions involving the population-specific
+        chems, such as the anabolism, since those chems are not yet created.
+        Again, they will be added through `register_chems`)
+        * params: dictionary of population- and model-specific parameters
+        '''
         self.specific_chems = NotImplemented
         self.affected_by_dilution = NotImplemented
         super().__init__()
 
     @abc.abstractmethod
     def get_derivatives(self, expanded_y, T, tracker):
+        '''Return a vector of derivatives for the concentration of all the
+        chems in the system, depending on the model's logics.
+        * expanded_y: concentrations vector of the system, in flat format
+        (no nesting) (array of floats)
+        * T: temperature of the system in Kelvin (float)
+        * tracker: instance implementing Simulation.AbstractLogger
+        '''
         pass
     
     @abc.abstractmethod
     def get_index_of_specific_chems_unaffected_by_dilution(self):
+        '''Return the index of all the specific chems of the model not
+        affected by the dilution rate of the system. The indexes
+        are returned as a list of integers
+        '''
         pass
 
     @abc.abstractmethod
