@@ -87,7 +87,7 @@ class Reaction:
         # from the reaction
         chem = next(chem for chem in self.reagents.keys() if chem.name == chem_name)
         factor = abs(self.reagents[chem])
-        self.reagents = {chem: coef / factor for chem, coef in self.reagents}
+        self.reagents = {chem: coef / factor for chem, coef in self.reagents.items()}
 
     def new_SimBioReaction(self, chems_list, parameters):
         '''Return a SimBioReaction instance based on the current Reaction
@@ -101,6 +101,15 @@ class Reaction:
                              for reagent, stoich
                              in self.reagents.items()}
         return Reaction(new_stoichiometry, self.name)
+
+    def __getitem__(self, key):
+        '''Get the stoichiometric coefficient of a reagent based on its name,
+        returns 0 if the reagent is not involved
+        '''
+        try:
+            return next(coef for chem, coef in self.reagents.items() if chem.name == key)
+        except StopIteration:
+            return 0
 
     def __str__(self):
         formatted_substrates = ["{}{}".format(stoichiometry != -1 and -stoichiometry or "", chem.name)
