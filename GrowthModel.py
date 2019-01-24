@@ -323,7 +323,7 @@ class SimpleGrowthModel(GrowthModel):
         derivatives[self.X] = atp_flux * self.Yatp
         return derivatives
 
-class SimpleGrowthModel2(GrowthModel):
+class Stahl(GrowthModel):
     """Implementation of a purposefully simple multi-pathway growth model.
     The rate of a pathway i is `rcat_i = [X] * FD * FT`
     For simplicity purpose, FD is multiplicative Monod kinetics and FT is Jin
@@ -331,26 +331,30 @@ class SimpleGrowthModel2(GrowthModel):
     
     The following parameters must be defined for the population;
     - X0: initial biomass concentration (molaa.L-1)
-    - anabolism: name of the population's reaction which is the anabolic reaction
     - chems dict path: (optional) path for the chems dict to be used when
       interpreting the anabolic reaction
     - Ym: true yield
-    - Mdc: Stahl's Mdc parameter
     - decay: biomass decay rate (h-1)
+    - anabolism: name of the population's reaction which is the anabolic reaction
     - biomass: the specie to be considered as biomass in the anabolic equation
+    - anabolism electron donor: the electron donor in the catabolism
+      or '' if the catabolism's electron donor is not involved in anabolism
+    - dGatp: the threshold energy for the catabolic pathways
     
     The following parameters must be defined for each pathway;
     - vmax: maximum catalytic rate
     - Km: affinity for substrate (dictionary)
+    - electron donor: the name of the electron donor
+    - m: a factor to multiply the threshold energy to adjust it by pathway
     """
     def __init__(self, population_name, chems_list, reactions, params):
         self.population_name = population_name
         self.chems_list = chems_list
         # take the specific parameters of the model
         self.X0 = params["X0"] # initial biomass concentration
-        self.Mdc = params["Mdc"]
         self.decay = params["decay"]
         self.biomass = params["biomass"]
+        self.an_eD = params["anabolism electron donor"]
         self.anabolism = params["anabolism"]
         # all the reactions which are not the anabolic reaction are considered
         # to be catabolic pathways
@@ -363,6 +367,7 @@ class SimpleGrowthModel2(GrowthModel):
         self.FD = _rates_dict["MM"](chems_list, params["fd"], params)
         self.FT = _rates_dict["JinBethkeFT"](chems_list, params["ft"], params)
         for pathway in self.pathways:
+            pathway.normalize(pathway.parameters["electron donor"])
             self.FD.prepare(pathway)
             self.FT.prepare(pathway)
             assert "phi cat" in pathway.parameters
@@ -377,8 +382,15 @@ class SimpleGrowthModel2(GrowthModel):
         # update the stoichiometry vector of the reactions
         for pathway in self.pathways:
             pathway.update_chems_list(self.chems_list)
-        # the anabolic reaction can now be converted to 
+        # the anabolic reaction can now be updated
         self.anabolism.update_chems_list(self.chems_list)
+        # Noguera's Mdc factor is determined based on biomass' stoichiometric coefficient
+        # If "electron donor" is set to null in the config file, it is assumed that it
+        # is not involved in the anabolic reaction, so no normalization is done
+        if self.an_eD: 
+            self.anabolism.normalize(self.an_eD)
+        self.Mdc = self.anabolism[self.specific_chems["biomass"]["name"]]
+
         # store the catabolism matrix now we know the length of the vectors
         self.reaction_matrix = np.vstack(pathway.stoichiometry_vector
                                          for pathway
@@ -398,11 +410,13 @@ class SimpleGrowthModel2(GrowthModel):
         return y0
 
     def get_stoichiometry(self, pathway, y, T, tracker):
+        eD = pathway.parameters["electron donor"]
         Ym = pathway.parameters["Ym"]
         Mdc = self.Mdc
         Rc = self.anabolism.stoichiometry_vector
         Re = pathway.stoichiometry_vector
-        return Ym * Mdc * Rc + (1 - Ym * Mdc) * Re
+        Rcd = pathway[eD]
+        return Ym * Mdc * Rc + (1 + Rcd * Ym * Mdc) * Re
 
     def get_derivatives(self, y, T, tracker):
         X = y[self.X]
@@ -582,5 +596,5 @@ _rates_dict = {"MM": MM_kinetics,
 
 growth_models_dict = {"ThermoAllocationModel": ThermoAllocationModel,
                       "SimpleGrowthModel": SimpleGrowthModel,
-                      "SimpleGrowthModel2": SimpleGrowthModel2,
+                      "Stahl": Stahl,
                       }
