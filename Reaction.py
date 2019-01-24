@@ -79,6 +79,16 @@ class Reaction:
                 reaction_dict[chem] = stoichiometry
         return cls(reaction_dict, name=name)
 
+    def normalize(self, chem_name):
+        '''Normalize the stoichiometry of the reaction so that the 
+        stoichiometric coefficient of a specific chem is 1 or -1
+        '''
+        # Get the Chem instance. If it fails, it means that the chem is absent
+        # from the reaction
+        chem = next(chem for chem in self.reagents.keys() if chem.name == chem_name)
+        factor = abs(self.reagents[chem])
+        self.reagents = {chem: coef / factor for chem, coef in self.reagents}
+
     def new_SimBioReaction(self, chems_list, parameters):
         '''Return a SimBioReaction instance based on the current Reaction
         instance'''
@@ -279,6 +289,10 @@ class SimBioReaction(Reaction):
         * C: concentrations vector (mol.L-1)
         * T: temperature (K)'''
         return self.stoichiometry_vector
+
+    def normalize(self, chem_name):
+        super().normalize(chem_name)
+        self.update_stoichiometry_vector()
 
     def __mul__(self, factor):
         '''Implement multiplication of reaction's stoichiometry by a numeric factor
