@@ -18,8 +18,8 @@ class Chem:
         else:
             self.composition["charge"] = 0
 
-    def copy(self):
-        return Chem(self.name, self.charge)
+    def copy(self, name=None):
+        return Chem(name or self.name, self.charge)
 
     def __str__(self):
         return self.name
@@ -57,8 +57,8 @@ class Molecule(Chem):
                 formula_string += "{:+d}".format(self.composition["charge"])
         return formula_string
 
-    def copy(self):
-        return Molecule(self.name, self.formula(), self.dGf0)
+    def copy(self, name=None):
+        return Molecule(name or self.name, self.formula(), self.dGf0)
 
 def load_chems_dict(path):
     with open(path, "r") as chems_fh:

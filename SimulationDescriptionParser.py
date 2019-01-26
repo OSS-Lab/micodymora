@@ -39,7 +39,7 @@ def inventory_chems(chems_dict, reactions, equilibria, glts, initial_concentrati
     output it as a list of strings.
     Also determines the nesting of the different chems (how they group
     according to their equilibrium, so the groups can be simulated together as
-    total quantities rahter than separately)
+    total quantities rather than separately)
     
     * chems_dict: dictionary of Chem instances ({chem_name: Chem}) to be used
     * reactions: list of Reaction instances representing all the catabolic reactions
@@ -67,6 +67,7 @@ def inventory_chems(chems_dict, reactions, equilibria, glts, initial_concentrati
         if gas not in chems_list and gas not in nevermind:
             chems_list.append(gas)
             nesting.append(nesting[-1] + 1)
+
     for reaction in reactions:
         for chem in reaction.reagents:
             if chem.name not in chems_list and chem.name not in nevermind:
@@ -197,7 +198,7 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
         indexes = dict() # local name -> index in chems_list
         for chem_name, chem_info in growth_model.specific_chems.items():
             if chem_info["template"]:
-                new_chem = chems_dict[chem_info["template"]].copy()
+                new_chem = chems_dict[chem_info["template"]].copy(name=chem_info["name"])
             else:
                 new_chem = Chem(chem_name)
             if chem_info["name"] in chems_dict:
