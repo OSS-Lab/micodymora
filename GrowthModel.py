@@ -387,7 +387,8 @@ class Stahl(GrowthModel):
         # is not involved in the anabolic reaction, so no normalization is done
         if self.an_eD: 
             self.anabolism.normalize(self.an_eD)
-        self.Mdc = self.anabolism[self.specific_chems["biomass"]["name"]]
+        self.Mdc = 1 / self.anabolism[self.specific_chems["biomass"]["name"]]
+        print(self.Mdc)
 
         # store the catabolism matrix now we know the length of the vectors
         self.reaction_matrix = np.vstack(pathway.stoichiometry_vector
@@ -422,7 +423,6 @@ class Stahl(GrowthModel):
                          for pathway in self.pathways)
         # each pathway is associated with a anabolism and catabolism stoichiometry
         R = [self.get_stoichiometry(pathway, y, T, tracker) for pathway in self.pathways]
-        tracker.update_log("\n".join("{}: {:.2e}".format(pathway.name, rcati) for pathway, rcati in zip(self.pathways, rcat)))
         derivatives = np.sum(stoech * rate for stoech, rate in zip(R, rcat))
         derivatives[self.X] -= self.decay * X
         return derivatives
