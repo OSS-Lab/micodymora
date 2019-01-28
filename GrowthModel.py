@@ -365,13 +365,11 @@ class Stahl(GrowthModel):
         self.affected_by_dilution = ["biomass"]
         # prepare the rate formula for each pathways
         self.FD = _rates_dict["MM"](chems_list, params["fd"], params)
-        self.FT = _rates_dict["JinBethkeFT"](chems_list, params["ft"], params)
+        self.FT = _rates_dict["energy threshold FT"](chems_list, params["ft"], params)
         for pathway in self.pathways:
             pathway.normalize(pathway.parameters["electron donor"])
             self.FD.prepare(pathway)
             self.FT.prepare(pathway)
-            assert "phi cat" in pathway.parameters
-            assert "m" in pathway.parameters
 
     def register_chems(self, indexes, chems_list, specific_reactions):
         # update the chems list
@@ -420,11 +418,11 @@ class Stahl(GrowthModel):
 
     def get_derivatives(self, y, T, tracker):
         X = y[self.X]
-        rcat = np.hstack(X * pathway.parameters["phi cat"] * self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
+        rcat = np.hstack(X * self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
                          for pathway in self.pathways)
-        tracker.update_log(rcat)
         # each pathway is associated with a anabolism and catabolism stoichiometry
         R = [self.get_stoichiometry(pathway, y, T, tracker) for pathway in self.pathways]
+        tracker.update_log("\n".join("{}: {:.2e}".format(pathway.name, rcati) for pathway, rcati in zip(self.pathways, rcat)))
         derivatives = np.sum(stoech * rate for stoech, rate in zip(R, rcat))
         derivatives[self.X] -= self.decay * X
         return derivatives
@@ -561,6 +559,32 @@ class JinBethkeFT(RateFunction):
             dissipation = 0
         return 1 - np.exp(dissipation / pathway.parameters["chi"] / T / Rkj)
 
+class energy_threshold_FT(RateFunction):
+    '''
+    FT factor as implemented by Noguera, Brusseau, Rittman and Stahl
+    (doi: 10.1002/(SICI)1097-0290(19980920)59:6<732::AID-BIT10>3.0.CO;2-7)
+
+    FT = (1 - exp((dGr - dGmin) / RT))
+
+    Expected pathway parameters:
+    * dGmin: minimum energy threshold for a pathway to run
+
+    Expected pathway methods:
+    * dG(C, T): the Gibbs energy differential of the pathway, ajusting it for
+    non-standard temperature and concentrations
+    '''
+    def __init__(self, chems_list, parameters, growth_model_parameters):
+        self.chems_list = chems_list
+
+    def prepare(self, pathway):
+        assert "dGmin" in pathway.parameters
+
+    def rate(self, pathway, C, T):
+        dissipation = pathway.dG(C, T) - pathway.parameters["dGmin"]
+        if dissipation > 0:
+            dissipation = 0
+        return 1 - np.exp(dissipation / T / Rkj)
+
 # WARNING: not validated
 class LaRowe2012FT(RateFunction):
     '''
@@ -591,6 +615,7 @@ class LaRowe2012FT(RateFunction):
 
 _rates_dict = {"MM": MM_kinetics,
                "HohCordRuwisch": HohCordRuwischRate,
+               "energy threshold FT": energy_threshold_FT,
                "JinBethkeFT": JinBethkeFT,
                "LaRowe2012FT": LaRowe2012FT}
 
