@@ -2,6 +2,7 @@ from micodymora.Chem import load_chems_dict
 from micodymora.Constants import Rkj
 
 import re
+import numbers
 import collections
 import numpy as np
 
@@ -97,10 +98,40 @@ class Reaction:
     def __mul__(self, factor):
         '''Implement multiplication of reaction's stoichiometry by a numeric factor
         '''
-        new_stoichiometry = {reagent: stoich * factor
-                             for reagent, stoich
-                             in self.reagents.items()}
-        return Reaction(new_stoichiometry, self.name)
+        if isinstance(factor, numbers.Real):
+            new_stoichiometry = {reagent: stoich * factor
+                                 for reagent, stoich
+                                 in self.reagents.items()}
+            return Reaction(new_stoichiometry, self.name)
+        else:
+            raise ValueError("Attempt to multiply a {} instance by a {} object".format(type(self), type(factor)))
+
+    def __rmul__(self, factor):
+        return self.__mul__(factor)
+
+    def __add__(self, operand):
+        '''Implement addition for reactions'''
+        if isinstance(operand, Reaction): # addition of two reactions
+            new_stoichiometry = self.reagents.copy()
+            for reagent in operand.reagents.keys():
+                # compare chems names instead of Chem instances directly
+                # because the same chem can correspond to different Chem
+                # instances between two Reaction instances
+                # eg: two reactions involving CO2 may have a "CO2" chem instance
+                # as key in their `reagents` dict, but it may be two different
+                # Chem instances bearing the same name
+                try:
+                    same_reagent = next(chem for chem in new_stoichiometry.keys() if chem.name == reagent.name)
+                    new_stoichiometry[same_reagent] += operand.reagents[reagent]
+                except StopIteration:
+                    new_stoichiometry[reagent] = operand.reagents[reagent]
+            new_name = "compound reaction"
+        elif isinstance(operand, numbers.Real): # addition of real number to reaction
+            new_stoichiometry = {reagent: stoich + operand
+                                 for reagent, stoich
+                                 in self.reagent.items()}
+            new_name = self.name
+        return Reaction(new_stoichiometry, new_name)
 
     def __getitem__(self, key):
         '''Get the stoichiometric coefficient of a reagent based on its name,
@@ -304,12 +335,19 @@ class SimBioReaction(Reaction):
         self.update_stoichiometry_vector()
 
     def __mul__(self, factor):
-        '''Implement multiplication of reaction's stoichiometry by a numeric factor
-        '''
-        new_stoichiometry = {reagent: stoich * factor
-                             for reagent, stoich
-                             in self.reagents.items()}
-        return SimBioReaction(new_stoichiometry, self.chems_list, self.parameters, self.name)
+        new_reaction = super().__mul__(factor)
+        return new_reaction.new_SimBioReaction(self.chems_list, self.parameters)
+
+    def __rmul__(self, factor):
+        return self.__mul__(factor)
+
+    def __add__(self, operand):
+        # NOTE: when adding two SimBioReaction instances, the parameters of the
+        # resulting reaction are the parameters of the leftmost reaction (I suppose)
+        if isinstance(operand, SimBioReaction):
+            assert self.chems_list == operand.chems_list
+        new_reaction = super().__add__(operand)
+        return new_reaction.new_SimBioReaction(self.chems_list, self.parameters)
 
 def load_reactions_dict(chems_path, reactions_path):
     chems_dict = load_chems_dict(chems_path)
