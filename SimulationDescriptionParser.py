@@ -218,7 +218,7 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
             # convert the local names in the specific reactions formulas into their global counterpart
             # (eg: convert "{biomass}" to "Dv_biomass" in the formula string)
             specific_chems_dict = {local_name: infos["name"] for local_name, infos in population.specific_chems.items()}
-            formula = reaction_info["formula"].format(**specific_chems)
+            formula = reaction_info["formula"].format(**specific_chems_dict)
             reaction = Reaction.from_string(chems_dict, formula, name=reaction_name)
             reaction = reaction.new_SimBioReaction(chems_list, reaction_info["parameters"])
             population_specific_reactions.append(reaction)
