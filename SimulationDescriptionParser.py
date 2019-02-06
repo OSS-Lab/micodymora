@@ -148,7 +148,8 @@ def get_catabolic_reactions(input_file, chems_dict, reactions_dict):
 # GrowthModel instances (which actually represent the populations).
 def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting):
     population_instances = list()
-    specific_reactions = dict() # {population_name: {reaction_name: {formula: str, parameters: list}}}
+    specific_reactions = dict() # {population name: {reaction name: {formula: str, parameters: list}}}
+    specific_indexes = dict() # {population name: {generic chem name: index}}
     for population_name, population in input_file.get("community").items():
         parameters = population.get("growth model").get("parameters")
         generic_reactions = list()
@@ -210,6 +211,7 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
             indexes[chem_name] = len(chems_list) - 1
             specific_chems[chem_name] = chem_info["name"]
         population_instances.append(growth_model)
+        specific_indexes[population_name] = indexes
     # Now all populations have been scanned, the chems_list is complete
     # Give to the knowledge of the chems_list to specific reactions and populations
     for population in population_instances:
@@ -222,7 +224,7 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
             reaction = Reaction.from_string(chems_dict, formula, name=reaction_name)
             reaction = reaction.new_SimBioReaction(chems_list, reaction_info["parameters"])
             population_specific_reactions.append(reaction)
-        population.register_chems(indexes, chems_list, population_specific_reactions)
+        population.register_chems(specific_indexes[population.population_name], chems_list, population_specific_reactions)
 
     return chems_list, nesting, chems_dict, population_instances
         
