@@ -145,7 +145,29 @@ class Simulation:
         glt_rate_matrix = np.matmul(np.diag(glt_rates), glt_matrix)
         dy_dt_glt = np.sum(glt_rate_matrix, axis=0)
         dy_dt = dy_dt_bio + dy_dt_chemo + dy_dt_glt
+        # derivatives
         return aggregate(dy_dt, self.nesting)
+
+    def f_diagnosis(self, t, y):
+        '''Do the same thing as the f function except that it does not
+        reaggregate the variables. It is used to show the derivatives
+        in the system after the integration has failed
+        '''
+        y = self.concentrations_pretreatment(y)
+        expanded_y = np.array(self.equilibrate(y))
+        # derivatives caused by biological reactions
+        bio_derivatives = self.community.get_derivatives(expanded_y, self.T, self.progress_tracker)
+        dy_dt_bio = np.sum(bio_derivatives, axis=0)
+        # derivatives caused by the chemostat
+        dy_dt_chemo = self.D_vector * (self.input - expanded_y)
+        # derivatives caused by gas-liquid transfers
+        glt_rates = self.system_glt.get_rates(expanded_y, self.T, self.progress_tracker)
+        glt_matrix = self.system_glt.get_matrix()
+        glt_rate_matrix = np.matmul(np.diag(glt_rates), glt_matrix)
+        dy_dt_glt = np.sum(glt_rate_matrix, axis=0)
+        dy_dt = dy_dt_bio + dy_dt_chemo + dy_dt_glt
+        # derivatives
+        return np.vstack([bio_derivatives, dy_dt_chemo, dy_dt_glt])
 
     def solve(self, time, dt):
         t = np.arange(0, time, dt)
@@ -172,6 +194,9 @@ class Simulation:
             self.status = simulation_status["has run until the end"]
         else:
             self.status = simulation_status["has run but stopped before the end"]
+            # diagnose
+            print("Something has gone wrong with the integration")
+            self.diagnose_integration_failure(solver)
 
         time_array = np.transpose(np.array(ts))
         conc_array = np.vstack(ys)
@@ -179,3 +204,29 @@ class Simulation:
         data = np.column_stack((time_array, conc_array))
         labels = ["time"] + self.chems_list
         return pd.DataFrame(data=data, columns=labels)
+
+    def diagnose_integration_failure(self, solver):
+        if solver.stiff:
+            print("The system is stiff")
+        else:
+            print("The system is not stiff")
+        print("Here are the derivatives of the different processes for each variable, sorted by absolute total derivative:")
+        header = "{:<14}{}\t{}\t{}".format("derivatives:", "\t".join(population.population_name for population in self.community.populations), "dilution", "gas/liquid transfers")
+        diagnosis_derivatives = self.f_diagnosis(solver.t, solver.y).transpose()
+        rows = sorted(zip(self.chems_list, diagnosis_derivatives),
+                      reverse=True,
+                      key=lambda row: abs(sum(row[1])))
+        formatted_rows = ("{:<14}{}".format(chem_name, "\t".join("{:.2e}".format(value) for value in values)) for chem_name, values in rows)
+        print(header)
+        print("\n".join(formatted_rows))
+        print("")
+        print("Here are the value/derivative ratio of consummed species:")
+        consummed_species_rows = sorted(((chem_name, y, sum(dy), y/sum(dy))
+                                         for chem_name, y, dy
+                                         in zip(self.chems_list, solver.y, diagnosis_derivatives)
+                                         if sum(dy) < 0),
+                                         key=lambda row: abs(row[3]))
+        print("{:<14}{:<14}{:<14}{:<14}".format("species", "value", "derivative", "ratio"))
+        print("\n".join("{:<14}{:<14.2e}{:<14.2e}{:<14.2e}".format(name, y, dy, ratio)
+              for name, y, dy, ratio
+              in consummed_species_rows))
