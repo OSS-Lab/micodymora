@@ -213,6 +213,7 @@ class Simulation:
         print("Here are the derivatives of the different processes for each variable, sorted by absolute total derivative:")
         header = "{:<14}{}\t{}\t{}".format("derivatives:", "\t".join(population.population_name for population in self.community.populations), "dilution", "gas/liquid transfers")
         diagnosis_derivatives = self.f_diagnosis(solver.t, solver.y).transpose()
+        expanded_y = self.equilibrate(solver.y)
         rows = sorted(zip(self.chems_list, diagnosis_derivatives),
                       reverse=True,
                       key=lambda row: abs(sum(row[1])))
@@ -223,7 +224,7 @@ class Simulation:
         print("Here are the value/derivative ratio of consummed species:")
         consummed_species_rows = sorted(((chem_name, y, sum(dy), y/sum(dy))
                                          for chem_name, y, dy
-                                         in zip(self.chems_list, solver.y, diagnosis_derivatives)
+                                         in zip(self.chems_list, expanded_y, diagnosis_derivatives)
                                          if sum(dy) < 0),
                                          key=lambda row: abs(row[3]))
         print("{:<14}{:<14}{:<14}{:<14}".format("species", "value", "derivative", "ratio"))
