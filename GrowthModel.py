@@ -263,66 +263,6 @@ growth rate: {:.2e}""".format("\n".join("* {}: {:.2e}".format(pathway.name, flow
         #tracker.update_log(f"pH: {-np.log10(y[self.chems_list.index('H+')]):.2f}")
         return derivatives
 
-class SimpleGrowthModel(GrowthModel):
-    """Implementation of a purposefully simple multi-pathway growth model.
-    The rate of a pathway i is `rcat_i = [X] * phi_cat_i * FD * FT`
-    The resulting ATP flux is `J_atp = sum(rcat_i * m_i)`
-    The resulting growth rate is `mu = J_atp * Yatp`
-    For simplicity purpose, FD is multiplicative Monod kinetics and FT is Jin
-    and Bethke's factor.
-    
-    The following parameters must be defined for the population;
-    - X0: initial biomass concentration (molaa.L-1)
-    - Yatp: biomass yield on ATP (molaa.molATP-1)
-    - dGatp: Gibbs energy differential stored in ATP (kJ.molATP-1)
-    
-    The following parameters must be defined for each pathway;
-    - vmax: maximum catalytic rate
-    - Km: affinity for substrate (dictionary)
-    - phi cat: fraction of total proteome being enzymes of the pathway (constant)
-    - m: number of ATP molecules produced per turnover
-    """
-    def __init__(self, population_name, chems_list, reactions, params):
-        self.population_name = population_name
-        self.chems_list = chems_list
-        self.pathways = reactions
-        # take the specific parameters of the model
-        self.X0 = params["X0"] # initial biomass concentration
-        self.Yatp = params["Yatp"] # biomass yield on ATP
-        # create the specific chems
-        self.specific_chems = ["{} total biomass".format(self.population_name)]
-        self.affected_by_dilution = [True]
-        # prepare the rate formula for each pathways
-        self.FD = _rates_dict["MM"](chems_list, params["fd"], params)
-        self.FT = _rates_dict["JinBethkeFT"](chems_list, params["ft"], params)
-        for pathway in self.pathways:
-            self.FD.prepare(pathway)
-            self.FT.prepare(pathway)
-            assert "phi cat" in pathway.parameters
-            assert "m" in pathway.parameters
-
-    def register_chems(self, indexes):
-        self.X = indexes[0] # chem 1 is for total biomass
-        for pathway in self.pathways:
-            pathway.update_chems_list(self.chems_list)
-        # now the reaction matrix of the pathways can be stored
-        self.reaction_matrix = np.vstack(pathway.stoichiometry_vector
-                                         for pathway
-                                         in self.pathways)
-
-    def set_initial_concentrations(self, y0):
-        y0[self.X] = self.X0
-        return y0
-
-    def get_derivatives(self, y, T, tracker):
-        X = y[self.X]
-        rcat = np.hstack(X * pathway.parameters["phi cat"] * self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
-                         for pathway in self.pathways)
-        derivatives = np.matmul(rcat, self.reaction_matrix)
-        atp_flux = sum(r * pathway.parameters["m"] for r, pathway in zip(rcat, self.pathways))
-        derivatives[self.X] = atp_flux * self.Yatp
-        return derivatives
-
 class Stahl(GrowthModel):
     """Implementation of a purposefully simple multi-pathway growth model.
     The rate of a pathway i is `rcat_i = [X] * FD * FT`
@@ -364,8 +304,8 @@ class Stahl(GrowthModel):
                                            "template": self.biomass}}
         self.affected_by_dilution = ["biomass"]
         # prepare the rate formula for each pathways
-        self.FD = _rates_dict["MM"](chems_list, params["fd"], params)
-        self.FT = _rates_dict["energy threshold FT"](chems_list, params["ft"], params)
+        self.FD = _rates_dict["MM"](chems_list, {}, params)
+        self.FT = _rates_dict["energy threshold FT"](chems_list, {}, params)
         for pathway in self.pathways:
             pathway.normalize(pathway.parameters["electron donor"])
             self.FD.prepare(pathway)
@@ -388,7 +328,6 @@ class Stahl(GrowthModel):
         if self.an_eD: 
             self.anabolism.normalize(self.an_eD)
         self.Mdc = 1 / self.anabolism[self.specific_chems["biomass"]["name"]]
-        print(self.Mdc)
 
         # store the catabolism matrix now we know the length of the vectors
         self.reaction_matrix = np.vstack(pathway.stoichiometry_vector
@@ -424,6 +363,100 @@ class Stahl(GrowthModel):
         # each pathway is associated with a anabolism and catabolism stoichiometry
         R = [self.get_stoichiometry(pathway, y, T, tracker) for pathway in self.pathways]
         derivatives = np.sum(stoech * rate for stoech, rate in zip(R, rcat))
+        derivatives[self.X] -= self.decay * X
+        return derivatives
+
+class SimpleGrowthModel(GrowthModel):
+    """
+    The following parameters must be defined for the population;
+    - X0: initial biomass concentration (molaa.L-1)
+    - chems dict path: (optional) path for the chems dict to be used when
+      interpreting the anabolic reaction
+    - decay: biomass decay rate (h-1)
+    - anabolism: name of the population's reaction which is the anabolic reaction
+    - biomass: the specie to be considered as biomass in the anabolic equation
+    
+    The following parameters must be defined for each pathway;
+    - vmax: maximum catalytic rate
+    - Km: affinity for substrate (dictionary)
+    - Yxs: the pathway's biomass yield
+    - norm: the chemical species by which the yield on the pathway is normalized
+    (The "s" of the Yx/s. Usually the electron donor)
+    """
+    def __init__(self, population_name, chems_list, reactions, params):
+        self.population_name = population_name
+        self.chems_list = chems_list
+        # take the specific parameters of the model
+        self.X0 = params["X0"] # initial biomass concentration
+        self.decay = params["decay"]
+        self.biomass = params["biomass"]
+        self.anabolism = params["anabolism"]
+        # all the reactions which are not the anabolic reaction are considered
+        # to be catabolic pathways
+        self.pathways = reactions
+        # create the specific chems
+        self.specific_chems = {"biomass": {"name": "{}_biomass".format(self.population_name),
+                                           "template": self.biomass}}
+        self.affected_by_dilution = ["biomass"]
+        # prepare the rate formula for each pathways
+        self.FD = _rates_dict["MM"](chems_list, {}, params)
+        self.FT = _rates_dict["energy threshold FT"](chems_list, {}, params)
+        for pathway in self.pathways:
+            assert "Yxs" in pathway.parameters
+            assert "norm" in pathway.parameters
+            pathway.normalize(pathway.parameters["norm"])
+            self.FD.prepare(pathway)
+            self.FT.prepare(pathway)
+
+    def register_chems(self, indexes, chems_list, specific_reactions):
+        # update the chems list
+        self.chems_list = chems_list
+        self.X = indexes["biomass"]
+        # store the anabolic reaction, apart from the catabolic pathways
+        self.anabolism = next(reaction for reaction in specific_reactions if reaction.name == self.anabolism)
+        # update the stoichiometry vector of the reactions
+        for pathway in self.pathways:
+            pathway.update_chems_list(self.chems_list)
+        # the anabolic reaction can now be updated
+        self.anabolism.update_chems_list(self.chems_list)
+        self.anabolism.normalize(self.specific_chems["biomass"]["name"])
+        # the stoichiometric coefficient for the normalizing species of each
+        # catabolic pathway in the anabolic reaction is stored as a parameter
+        self.coef_norm = [self.anabolism.stoichiometry_vector[self.chems_list.index(pathway.parameters["norm"])]
+                          for pathway
+                          in self.pathways]
+
+        # store the catabolism matrix now we know the length of the vectors
+        self.reaction_matrix = np.vstack(pathway.stoichiometry_vector
+                                         for pathway
+                                         in self.pathways)
+
+    def get_index_of_specific_chems_unaffected_by_dilution(self):
+        return [self.chems_list.index(chem_info["name"])
+                for chem_kind, chem_info
+                in self.specific_chems.items()
+                if chem_kind not in self.affected_by_dilution]
+
+    def add_reaction(self, reaction):
+        self.pathways.append(reaction)
+
+    def set_initial_concentrations(self, y0):
+        y0[self.X] = self.X0
+        return y0
+
+    def get_derivatives(self, y, T, tracker):
+        X = y[self.X]
+        rcat = np.hstack(self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
+                         for pathway in self.pathways)
+        # rate of anabolism = -Yxs rcat / nu_an_S (1 - Yxs)
+        ran = np.hstack((pathway.parameters["Yxs"] * rcat_i) / (1 + norm * pathway.parameters["Yxs"])
+                        for pathway, rcat_i, norm
+                        in zip(self.pathways, rcat, self.coef_norm))
+        # each pathway is associated with a anabolism and catabolism stoichiometry
+        metabolisms = np.array([rcat_i * pathway.stoichiometry_vector + ran_i * self.anabolism.stoichiometry_vector
+                                for rcat_i, ran_i, pathway
+                                in zip(rcat, ran, self.pathways)])
+        derivatives = X * np.sum(metabolisms, axis=0)
         derivatives[self.X] -= self.decay * X
         return derivatives
 
