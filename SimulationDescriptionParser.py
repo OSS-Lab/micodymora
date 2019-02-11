@@ -253,7 +253,7 @@ def get_system_glt(input_file, glt_dict, chems_list):
     vliq = gl_info.get("vliq", 1)
     vgas = gl_info.get("vgas", 1)
     headspace_pressure = gl_info.get("headspace pressure", 1)
-    alpha = gl_info.get("alpha", 1)
+    alpha = gl_info.get("alpha", 0)
     return SystemGasLiquidTransfers(chems_list, glts, vliq, vgas, headspace_pressure, alpha)
 
 def get_simulation(input_file, logger=None, progress_tracker=None):
