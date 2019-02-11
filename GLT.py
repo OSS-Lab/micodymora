@@ -38,6 +38,7 @@ class SimulationGasLiquidTransfer(GasLiquidTransfer):
         return self.stoichiometry_vector
 
     def get_rate(self, C, T, tracker):
+        """Compute the transfer rate from the gas phase to the liquid phase"""
         Cg = C[self.gas_index]
         Cl = C[self.liquid_index]
         H = self.H0cp * np.exp(self.Hsol * (1/T - 1/T0))
@@ -58,7 +59,8 @@ class SystemGasLiquidTransfers:
         * vliq: volume of liquid phase (L)
         * vgas: volume of gas phase (L)
         * headspace_pressure: headspace space (atm)
-        * alpha: coefficient related to gas flow'''
+        * alpha: coefficient characterizing the outflow from the gas phase
+          through a valve'''
         self.transfers = transfers
         self.vliq = vliq
         self.vgas = vgas
@@ -77,8 +79,9 @@ class SystemGasLiquidTransfers:
     def get_rates(self, C, T, tracker):
         equilibration_rate = np.hstack(transfer.get_rate(C, T, tracker) for transfer in self.transfers) * self.vliq / self.vgas
         # should also account for water vapour pressure. Ignored for the moment
+        # gas outflow through a valve (only enabled if the alpha parameter is set to a non-zero value)
         total_gas_pressure = sum(transfer.get_partial_pressure(C) for transfer in self.transfers)
-        gas_outflow_rate = np.array([self.alpha * (total_gas_pressure - self.headspace_pressure)]) 
+        gas_outflow_rate = np.array([self.alpha * (total_gas_pressure - self.headspace_pressure) * (total_gas_pressure > self.headspace_pressure)]) 
         return np.hstack([equilibration_rate, gas_outflow_rate])
 
 def load_glt_dict(chems_data_path, glt_data_path):
