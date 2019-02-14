@@ -145,7 +145,6 @@ class Simulation:
         glt_rate_matrix = np.matmul(np.diag(glt_rates), glt_matrix)
         dy_dt_glt = np.sum(glt_rate_matrix, axis=0)
         dy_dt = dy_dt_bio + dy_dt_chemo + dy_dt_glt
-        # derivatives
         return aggregate(dy_dt, self.nesting)
 
     def f_diagnosis(self, t, y):
@@ -175,7 +174,6 @@ class Simulation:
         solver.set_integrator("lsoda")
         solver.set_initial_value(self.y0)
         self.progress_tracker.set_total_time(time)
-
         ts = []
         ys = []
 
@@ -183,6 +181,7 @@ class Simulation:
         while solver.successful() and solver.t < time:
             solver.integrate(solver.t + dt)
             expanded_y = self.equilibrate(solver.y)
+
             ts.append(solver.t)
             ys.append(expanded_y)
             self.logger.do_log(self, solver.t, solver.y, expanded_y)
