@@ -372,14 +372,15 @@ class SimpleGrowthModel(GrowthModel):
     - X0: initial biomass concentration (molaa.L-1)
     - chems dict path: (optional) path for the chems dict to be used when
       interpreting the anabolic reaction
-    - decay: biomass decay rate (h-1)
+    - maintenance: maintenance energy flow rate (kJ.molX-1.hour-1)
+    - energy barrier: total energy cost of biomass replication (dissipation + anabolism)
     - anabolism: name of the population's reaction which is the anabolic reaction
     - biomass: the specie to be considered as biomass in the anabolic equation
+    (kJ.molX-1, negative)
     
     The following parameters must be defined for each pathway;
     - vmax: maximum catalytic rate
     - Km: affinity for substrate (dictionary)
-    - Yxs: the pathway's biomass yield
     - norm: the chemical species by which the yield on the pathway is normalized
     (The "s" of the Yx/s. Usually the electron donor)
     """
@@ -388,7 +389,8 @@ class SimpleGrowthModel(GrowthModel):
         self.chems_list = chems_list
         # take the specific parameters of the model
         self.X0 = params["X0"] # initial biomass concentration
-        self.decay = params["decay"]
+        self.maintenance = params["maintenance"]
+        self.energy_barrier = params["energy barrier"]
         self.biomass = params["biomass"]
         self.anabolism = params["anabolism"]
         # all the reactions which are not the anabolic reaction are considered
@@ -404,7 +406,7 @@ class SimpleGrowthModel(GrowthModel):
         for pathway in self.pathways:
             assert "Yxs" in pathway.parameters
             assert "norm" in pathway.parameters
-            pathway.normalize(pathway.parameters["norm"])
+            #pathway.normalize(pathway.parameters["norm"])
             self.FD.prepare(pathway)
             self.FT.prepare(pathway)
 
@@ -420,11 +422,6 @@ class SimpleGrowthModel(GrowthModel):
         # the anabolic reaction can now be updated
         self.anabolism.update_chems_list(self.chems_list)
         self.anabolism.normalize(self.specific_chems["biomass"]["name"])
-        # the stoichiometric coefficient for the normalizing species of each
-        # catabolic pathway in the anabolic reaction is stored as a parameter
-        self.coef_norm = [self.anabolism.stoichiometry_vector[self.chems_list.index(pathway.parameters["norm"])]
-                          for pathway
-                          in self.pathways]
 
         # store the catabolism matrix now we know the length of the vectors
         self.reaction_matrix = np.vstack(pathway.stoichiometry_vector
@@ -448,16 +445,14 @@ class SimpleGrowthModel(GrowthModel):
         X = y[self.X]
         rcat = np.hstack(self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
                          for pathway in self.pathways)
-        # rate of anabolism = -Yxs rcat / nu_an_S (1 - Yxs)
-        ran = np.hstack((pathway.parameters["Yxs"] * rcat_i) / (1 + norm * pathway.parameters["Yxs"])
-                        for pathway, rcat_i, norm
-                        in zip(self.pathways, rcat, self.coef_norm))
+        # rate of energy intake from the environment
+        JG = sum(rcat_i * pathway.dG(y, T) for rcat_i, pathway in zip(rcat, self.pathways))
+        ran = (JG - self.maintenance) / self.energy_barrier
         # each pathway is associated with a anabolism and catabolism stoichiometry
-        metabolisms = np.array([rcat_i * pathway.stoichiometry_vector + ran_i * self.anabolism.stoichiometry_vector
-                                for rcat_i, ran_i, pathway
-                                in zip(rcat, ran, self.pathways)])
-        derivatives = X * np.sum(metabolisms, axis=0)
-        derivatives[self.X] -= self.decay * X
+        metabolism = np.sum(np.array([rcat_i * pathway.stoichiometry_vector
+                                      for rcat_i, pathway
+                                      in zip(rcat, self.pathways)]), axis=0) + ran * self.anabolism.stoichiometry_vector
+        derivatives = X * metabolism
         return derivatives
 
 class RateFunction(abc.ABC):
