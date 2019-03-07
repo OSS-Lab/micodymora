@@ -174,8 +174,10 @@ class Simulation:
         solver.set_integrator("lsoda")
         solver.set_initial_value(self.y0)
         self.progress_tracker.set_total_time(time)
-        ts = []
-        ys = []
+        expanded_y = self.equilibrate(self.y0)
+        ts = [0]
+        ys = [expanded_y]
+        self.logger.do_log(self, 0, self.y0, expanded_y)
 
         self.status = simulation_status["is running"]
         while solver.successful() and solver.t < time:
