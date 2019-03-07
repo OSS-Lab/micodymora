@@ -404,9 +404,6 @@ class SimpleGrowthModel(GrowthModel):
         self.FD = _rates_dict["MM"](chems_list, {}, params)
         self.FT = _rates_dict["energy threshold FT"](chems_list, {}, params)
         for pathway in self.pathways:
-            assert "Yxs" in pathway.parameters
-            assert "norm" in pathway.parameters
-            #pathway.normalize(pathway.parameters["norm"])
             self.FD.prepare(pathway)
             self.FT.prepare(pathway)
 
