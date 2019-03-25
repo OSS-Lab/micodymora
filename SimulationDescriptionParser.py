@@ -25,7 +25,7 @@ default_reactions_description_path = os.path.join(module_path, "reactions.dat")
 default_equilibria_description_path = os.path.join(module_path, "equilibria.dat")
 default_glt_description_path = os.path.join(module_path, "gas_liquid_transfer.dat")
 
-_population_specific_chems_pat = re.compile("\{(.+)\}")
+_population_specific_chems_pat = re.compile("\{([^}]+)\}")
 
 class OverlappingEquilibriaException(Exception):
     '''When the system's equilibria are defined, a single chemical species
