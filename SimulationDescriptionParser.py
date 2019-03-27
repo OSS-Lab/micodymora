@@ -187,7 +187,7 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
                 generic_reactions.append(simbioreaction)
         # instanciate the population
         growth_model_name = population.get("growth model").get("name")
-        growth_model = growth_models_dict[growth_model_name](population_name, chems_list, generic_reactions, parameters)
+        growth_model = growth_models_dict[growth_model_name](population_name, chems_list, generic_reactions, population.get("pathways"), parameters)
         # add the specific chems of the population to chems list, chems dict and nestings list
         # growth_model is expected to have a `specific_chems` attribute, which has the structure;
         # {local_name: {name: global_name, template: template}}
