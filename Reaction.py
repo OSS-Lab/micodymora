@@ -6,6 +6,8 @@ import numbers
 import collections
 import numpy as np
 
+import pdb
+
 class ImbalancedReactionException(Exception):
     pass
 
@@ -179,6 +181,8 @@ class SimulationReaction(Reaction):
     def lnQ(self, C):
         '''Natural logarithm of the mass action ratio of the reaction.
         * C: concentrations vector (mol.L-1)'''
+        # set null or negative concentrations to machine epsilon
+        C = np.clip(C, np.finfo(float).eps, None)
         return sum(stoich * np.log(conc)
                     for stoich, conc
                     in zip(self.stoichiometry_vector, C))
@@ -307,6 +311,8 @@ class SimBioReaction(Reaction):
     def lnQ(self, C):
         '''Natural logarithm of the mass action ratio of the reaction.
         * C: concentrations vector (mol.L-1)'''
+        # set null or negative concentrations to machine epsilon
+        C = np.clip(C, np.finfo(float).eps, None)
         return sum(stoich * np.log(conc)
                     for stoich, conc
                     in zip(self.stoichiometry_vector, C))

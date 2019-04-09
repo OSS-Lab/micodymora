@@ -132,7 +132,6 @@ class Simulation:
         * t: time (in hour)
         * y: concentration vector (aggregated) (in M)
         '''
-        y = self.concentrations_pretreatment(y)
         expanded_y = np.array(self.equilibrate(y))
         # derivatives caused by biological reactions
         bio_derivatives = self.community.get_derivatives(expanded_y, self.T, self.progress_tracker)
@@ -152,7 +151,6 @@ class Simulation:
         reaggregate the variables. It is used to show the derivatives
         in the system after the integration has failed
         '''
-        y = self.concentrations_pretreatment(y)
         expanded_y = np.array(self.equilibrate(y))
         # derivatives caused by biological reactions
         bio_derivatives = self.community.get_derivatives(expanded_y, self.T, self.progress_tracker)
@@ -175,6 +173,7 @@ class Simulation:
         solver.set_initial_value(self.y0)
         self.progress_tracker.set_total_time(time)
         expanded_y = self.equilibrate(self.y0)
+        assert all(y >= 0 for y in expanded_y)
         ts = [0]
         ys = [expanded_y]
         self.logger.do_log(self, 0, self.y0, expanded_y)
@@ -182,6 +181,7 @@ class Simulation:
         self.status = simulation_status["is running"]
         while solver.successful() and solver.t < time:
             solver.integrate(solver.t + dt)
+            assert all(y >= 0 for y in expanded_y)
             expanded_y = self.equilibrate(solver.y)
 
             ts.append(solver.t)
