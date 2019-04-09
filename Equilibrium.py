@@ -1,3 +1,34 @@
+"""
+# responsibility
+
+This module contains classes designed to implement instantaneous chemical
+equilibria.
+
+* Equilibrium instances represent an equilibrium in general (for example Ac <->
+  Ac-)
+
+* SystemEquilibrator contains all the Equilibrium instances used in a specific
+  simulation. It first determines the pH that make the charge balance null,
+  then sets the concentration of all species involved in equilibria according
+  to this pH.
+
+# behavior toward spurrious input
+
+Provided that the equilibrium constants defined in equilibria.dat are all
+positive or null, and that the concentration of all chemical species are
+positive or null, the equilibration process cannot generate negative or null
+concentrations.
+
+If the proton concentration is negative or null before the equilibration, it
+should have no impact since its concentration is reset between 1e-14 and 1 M
+during the process. If total concentration of a species (the sum of all its
+forms) is negative, then the negative total will be "shared" between the forms
+(for example if there is a species AH <-> A- whose total concentration is -5
+and the pH equals its pKa, then AH and A- will be at -2.5 M). Note that
+negative concentrations among the to-be-equilibrated species will mess the pH
+determination up, leading either to wrong pH or impossibility to determine pH.
+"""
+
 from micodymora.Chem import load_chems_dict
 from micodymora.Reaction import Reaction
 from micodymora.Constants import T0
