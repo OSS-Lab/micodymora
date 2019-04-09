@@ -1,3 +1,58 @@
+"""
+# responsibility
+
+This module contains classes designed to implement Gas-Liquid Transfers (GLT).
+
+* GasLiquidTransfer instances represent specific GLTs (such as H2(g) <->
+  H2(aq)) in general
+
+* SimulationGasLiquidTransfer instances represent GLTs in a specific simulation
+  (knowing the index of their gas and liquid phase in the simulation's
+  concentration vector, and knowing their kla)
+
+* SystemGasLiquidTransfers contains all the GLTs to account for in a simulation,
+  it triggers the computation of all GLT dynamics by asking all its
+  SimulationGasLiquidTransfer instances, and it serves as an interface with
+  the Simulation instance.
+
+# GLT rate expression
+
+The transfer rate from gas to liquid is
+
+> kla * (L - G * H)
+
+with kla the volumetric mass transfer coefficient (h-1), L the concentration of
+species in the liquid phase (M), G the concentration of species in the gas
+phase (atm) and H the Henry constant (M.atm-1).
+
+# Gas outflow rate
+
+The GLT dynamics also include an expression for a valve in the culture vessel.
+The expression of the outflow by the valve is
+
+> alpha * (sum partial_pressure - headspace_pressure)
+
+It occurs only if the sum of partial pressures in the vessel is superior to the
+headspace pressure, so gas can only flow out, not in. The alpha parameter is
+set to 0 by default, so the valve actually works only if explicitely decided by
+the user in the configuration file.
+
+# behaviour towards spurrious input
+
+The computation of the transfer rates cannot give rise to null or negative
+concentrations from positive concentrations, because the dynamics are of the
+form C(t) = C0 exp(kt).
+
+However, make sure that the input contains no null or negative values; it is
+not this module's responsibility to ensure that and it won't produce consistent
+results then.  Indeed, if the concentration of one of the two phases is null or
+negative, the other phase will transfer into it to equilibrate it.  If both
+phases are null or negative, GLT will produce artefactual oscillations between
+the two phases (gas goes down, liquid goes up until it reaches zero or more,
+then liquids transfers back to gas and goes negative again, and the cycle
+repeats).
+"""
+
 from micodymora.Constants import T0
 from micodymora.Chem import load_chems_dict
 
