@@ -230,7 +230,7 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
         
 def get_initial_concentrations(input_file, chems_list, nesting, populations):
     '''Return the vector of initial concentrations in aggregated format.'''
-    initial_concentrations = np.zeros(len(chems_list)) + np.finfo(float).eps
+    initial_concentrations = np.zeros(len(chems_list))
     concentration_settings = input_file.get("concentrations", {})
     for chem_name, chem_conc in concentration_settings.items():
         initial_concentrations[chems_list.index(chem_name)] = chem_conc
@@ -257,6 +257,8 @@ def get_system_glt(input_file, glt_dict, chems_list):
     return SystemGasLiquidTransfers(chems_list, glts, vliq, vgas, headspace_pressure, alpha)
 
 def get_simulation(input_file, logger=None, progress_tracker=None):
+    # get the absolute tolerance of the integrator
+    atol = input_file.get("atol", None)
     # get system's temperature
     # or assume it is the standard temperature if unspecified
     T = input_file.get("T", T0)
@@ -277,8 +279,10 @@ def get_simulation(input_file, logger=None, progress_tracker=None):
     # instanciate the community
     community = Community(populations)
 
-    # pass logger and tracker if they are defined
+    # pass atol, logger and tracker if they are defined
     params = dict()
+    if atol:
+        params["atol"] = atol
     if logger:
         params["logger"] = logger
     if progress_tracker:

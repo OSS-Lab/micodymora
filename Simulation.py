@@ -1,7 +1,7 @@
 from micodymora.Nesting import aggregate
 from micodymora.Spinner import spinner
 
-from scipy.integrate import odeint, ode
+from scipy.integrate import ode
 import abc
 import numpy as np
 import pandas as pd
@@ -70,7 +70,7 @@ simulation_status = {
 "has run but stopped before the end": 3}
 class Simulation:
     def __init__(self, chems_list, nesting, system_equilibrator, system_glt, community,
-    initial_concentrations, T, D, logger=BlankLogger(), progress_tracker=BlankProgressTracker()):
+    initial_concentrations, T, D, atol=1e-3, logger=BlankLogger(), progress_tracker=BlankProgressTracker()):
         '''
         * chems_list: list of the name of the chemical species involved in the
         simulation, in the same order as in the expanded concentration vector
@@ -82,14 +82,17 @@ class Simulation:
         * initial_concentration: aggregated concentration vector (numpy array)
         * T: system's temperature (1x1 float, K)
         * D: dilution rate (hour-1)
+        * atol: absolute tolerance of the integrator
         * logger: a logger instance inheriting from AbstractLogger
         '''
+        self.atol = atol
         self.chems_list = chems_list
         self.nesting = nesting
         self.system_equilibrator = system_equilibrator
         self.system_glt = system_glt
         self.community = community
         self.y0 = initial_concentrations
+        self.nested_species_names = [str(equilibrium).replace("eq: ", "") for equilibrium in self.system_equilibrator.equilibria]
         # use the (equilibrated) initial concentrations as definition for the
         # chemostat input. Remove the population-specific variables
         # (ATP, biomass...).
@@ -132,6 +135,7 @@ class Simulation:
         * t: time (in hour)
         * y: concentration vector (aggregated) (in M)
         '''
+        y = np.clip(y, 0, None)
         expanded_y = np.array(self.equilibrate(y))
         # derivatives caused by biological reactions
         bio_derivatives = self.community.get_derivatives(expanded_y, self.T, self.progress_tracker)
@@ -169,7 +173,7 @@ class Simulation:
     def solve(self, time, dt):
         t = np.arange(0, time, dt)
         solver = ode(self.f)
-        solver.set_integrator("lsoda")
+        solver.set_integrator("lsoda", atol=self.atol)
         solver.set_initial_value(self.y0)
         self.progress_tracker.set_total_time(time)
         expanded_y = self.equilibrate(self.y0)
@@ -179,9 +183,9 @@ class Simulation:
         self.logger.do_log(self, 0, self.y0, expanded_y)
 
         self.status = simulation_status["is running"]
-        while solver.successful() and solver.t < time:
+        while solver.successful() and solver.t <= time:
             solver.integrate(solver.t + dt)
-            assert all(y >= 0 for y in expanded_y)
+
             expanded_y = self.equilibrate(solver.y)
 
             ts.append(solver.t)
