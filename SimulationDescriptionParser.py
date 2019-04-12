@@ -281,12 +281,13 @@ def get_simulation(input_file, logger=None, progress_tracker=None, check_uniniti
 
     # check species sets initialized to null
     if check_uninitialized_sets:
+        warning_issued = False
         equilibria = [{chem.name for chem in equilibrium.chems} for equilibrium in system_equilibrator.equilibria]
         transfers = [{transfer.liquid_chem.name, transfer.gas_chem.name} for transfer in system_glt.transfers]
         nests = list()
         seen = set()
         for equilibrium in equilibria:
-            nest = equilibrium
+            nest = equilibrium.copy()
             for transfer in transfers:
                 if transfer & nest:
                     nest |= transfer
@@ -297,7 +298,10 @@ def get_simulation(input_file, logger=None, progress_tracker=None, check_uniniti
         nests_concentrations = [sum(y0[chem_to_nest_mapping[name][0]] for name in nest) for nest in nests]
         for n, c in zip(nests, nests_concentrations):
             if c == 0 and n != ("H+",) and n != ("HO-",):
+                warning_issued = True
                 print("WARNING: Set {} initialized with null concentration: this may cause numerical instability".format(n))
+        if warning_issued:
+            print("If null concentrations cause numerical unstability in the results, consider decreasing the \"atol\" parameter")
 
     # pass atol, logger and tracker if they are defined
     params = dict()
