@@ -256,7 +256,7 @@ def get_system_glt(input_file, glt_dict, chems_list):
     alpha = gl_info.get("alpha", 0)
     return SystemGasLiquidTransfers(chems_list, glts, vliq, vgas, headspace_pressure, alpha)
 
-def get_simulation(input_file, logger=None, progress_tracker=None):
+def get_simulation(input_file, logger=None, progress_tracker=None, check_uninitialized_sets=True):
     # get the absolute tolerance of the integrator
     atol = input_file.get("atol", None)
     # get system's temperature
@@ -278,6 +278,26 @@ def get_simulation(input_file, logger=None, progress_tracker=None):
  
     # instanciate the community
     community = Community(populations)
+
+    # check species sets initialized to null
+    if check_uninitialized_sets:
+        equilibria = [{chem.name for chem in equilibrium.chems} for equilibrium in system_equilibrator.equilibria]
+        transfers = [{transfer.liquid_chem.name, transfer.gas_chem.name} for transfer in system_glt.transfers]
+        nests = list()
+        seen = set()
+        for equilibrium in equilibria:
+            nest = equilibrium
+            for transfer in transfers:
+                if transfer & nest:
+                    nest |= transfer
+            if not nest & seen:
+                nests.append(tuple(nest))
+            seen |= nest
+        chem_to_nest_mapping = {chem: [index for index, chems in enumerate(equilibria) if chem in chems] for chem in chems_list}
+        nests_concentrations = [sum(y0[chem_to_nest_mapping[name][0]] for name in nest) for nest in nests]
+        for n, c in zip(nests, nests_concentrations):
+            if c == 0 and n != ("H+",) and n != ("HO-",):
+                print("WARNING: Set {} initialized with null concentration: this may cause numerical instability".format(n))
 
     # pass atol, logger and tracker if they are defined
     params = dict()
