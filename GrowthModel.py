@@ -293,7 +293,6 @@ class SimpleGrowthModel(GrowthModel):
     - X0: initial biomass concentration (molaa.L-1)
     - chems dict path: (optional) path for the chems dict to be used when
       interpreting the anabolic reaction
-    - maintenance: maintenance energy flow rate (kJ.molX-1.hour-1)
     - energy barrier: total energy cost of biomass replication (dissipation + anabolism)
     - anabolism: name of the population's reaction which is the anabolic reaction
     - biomass: the specie to be considered as biomass in the anabolic equation
@@ -310,8 +309,6 @@ class SimpleGrowthModel(GrowthModel):
         self.chems_list = chems_list
         # take the specific parameters of the model
         self.X0 = params["X0"] # initial biomass concentration
-        self.maintenance = params["maintenance"]
-        self.energy_barrier = params["energy barrier"]
         self.biomass = params["biomass"]
         self.anabolism = params["anabolism"]
         # all the reactions which are not the anabolic reaction are considered
@@ -324,9 +321,11 @@ class SimpleGrowthModel(GrowthModel):
         # prepare the rate formula for each pathways
         self.FD = _rates_dict["MM"](chems_list, {}, params)
         self.FT = _rates_dict["energy threshold FT"](chems_list, {}, params)
-        for pathway in self.pathways:
+        self.energy_barriers = np.zeros(len(self.pathways))
+        for index, pathway in enumerate(self.pathways):
             self.FD.prepare(pathway)
             self.FT.prepare(pathway)
+            self.energy_barriers[index] = pathway.parameters["energy barrier"]
 
     def register_chems(self, indexes, chems_list, specific_reactions):
         # update the chems list
@@ -334,6 +333,9 @@ class SimpleGrowthModel(GrowthModel):
         self.X = indexes["biomass"]
         # store the anabolic reaction, apart from the catabolic pathways
         self.anabolism = next(reaction for reaction in specific_reactions if reaction.name == self.anabolism)
+        # save a vector of the anabolic reaction stoichiometry that have the right shape for numpy computations
+        # (the anabolic stoichiometry vector duplicated for each pathway and stacked into rows)
+        self.anabolism_stoichiometry_vector = np.row_stack(self.anabolism.stoichiometry_vector for i in range(len(self.pathways)))
         # update the stoichiometry vector of the reactions
         for pathway in self.pathways:
             pathway.update_chems_list(self.chems_list)
@@ -342,9 +344,9 @@ class SimpleGrowthModel(GrowthModel):
         self.anabolism.normalize(self.specific_chems["biomass"]["name"])
 
         # store the catabolism matrix now we know the length of the vectors
-        self.reaction_matrix = np.vstack(pathway.stoichiometry_vector
-                                         for pathway
-                                         in self.pathways)
+        self.reaction_matrix = np.row_stack(pathway.stoichiometry_vector
+                                            for pathway
+                                            in self.pathways)
 
     def get_index_of_specific_chems_unaffected_by_dilution(self):
         return [self.chems_list.index(chem_info["name"])
@@ -361,15 +363,14 @@ class SimpleGrowthModel(GrowthModel):
 
     def get_derivatives(self, y, T, tracker):
         X = y[self.X]
-        rcat = np.hstack(self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
-                         for pathway in self.pathways)
+        dG = np.column_stack(pathway.dG(y, T) for pathway in self.pathways)
+        rcat = np.column_stack(self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
+                               for pathway in self.pathways)
+        JG = rcat * dG
         # rate of energy intake from the environment
-        JG = sum(rcat_i * pathway.dG(y, T) for rcat_i, pathway in zip(rcat, self.pathways))
-        ran = (JG - self.maintenance) / self.energy_barrier
+        ran = JG / self.energy_barriers
         # each pathway is associated with a anabolism and catabolism stoichiometry
-        metabolism = np.sum(np.array([rcat_i * pathway.stoichiometry_vector
-                                      for rcat_i, pathway
-                                      in zip(rcat, self.pathways)]), axis=0) + ran * self.anabolism.stoichiometry_vector
+        metabolism = np.dot(rcat, self.reaction_matrix) + np.dot(ran, self.anabolism_stoichiometry_vector)
         derivatives = X * metabolism
         return derivatives
 
