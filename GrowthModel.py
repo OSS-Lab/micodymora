@@ -4,6 +4,7 @@ import abc
 import numpy as np
 import functools
 import operator
+import re
 
 class GrowthModel(abc.ABC):
     '''Classes inheriting from GrowthModel represent a microbial population,
@@ -14,7 +15,7 @@ class GrowthModel(abc.ABC):
     * affected_by_dilution: boolean vector specifying whether the specific
     chems of the population are affected by the chemostat's dilution rate or not
     '''
-    def __init__(self, population_name, chems_list, reactions, params):
+    def __init__(self, population_name, chems_list, reactions, pathways, params):
         '''
         * population_name: name of the population (string)
         * chems_list: list of the name of the chems being part of the simulation
@@ -28,6 +29,8 @@ class GrowthModel(abc.ABC):
         list does not contain the reactions involving the population-specific
         chems, such as the anabolism, since those chems are not yet created.
         Again, they will be added through `register_chems`)
+        * pathways: the pathways, as a dictionary, as extracted from the
+          config file
         * params: dictionary of population- and model-specific parameters
         '''
         self.specific_chems = NotImplemented
@@ -78,6 +81,109 @@ class GrowthModel(abc.ABC):
         in the initial concentrations vector'''
         pass
 
+class ObjectivelessModel(GrowthModel):
+    specific_chem_pat = re.compile("{([^{]+)}")
+    # FIXME: UNSOLVED DESIGN QUESTIONS:
+    # - the population needs the system's volume: how to transmit it?
+    def __init__(self, population_name, chems_list, reactions, pathways, params):
+        # model-specific parameters
+        self.AXP_per_P = 1.06 # mol(ATP + ADP)/mol(proteins)
+        self.initial_ATP_ADP_ratio = 7.6
+        self.NADX_per_P = 0.12 # mol(NAD+ + NADH)/mol(proteins)
+        self.initial_NAD_NADH_ratio = 7.8 # based on Andersen and von Meyenburg
+        self.initial_metabolite_concentration = 1e-4 # Based on nothing
+        self.FD = _rates_dict["MM"](chems_list, {}, params)
+        self.FT = _rates_dict["energy threshold FT"](chems_list, {}, params)
+        # population-specific parameters
+        self.population_name = population_name
+        self.chems_list = chems_list
+        # 1. get the model's parameters
+        self.X0 = params["X0"]
+        # 2. get the model's specific chems
+        # first: set the mandatory chems (intracellular protons,
+        # ATP, NADH, ATP synthase, NADH deshydrogenase)
+        self.specific_chems = {"pH": {"name": "{}_pH".format(self.population_name),
+                                              "template": None,
+                                              "initial concentration": 7},
+                               "ATP": {"name": "{}_ATP".format(self.population_name),
+                                               "template": "ATP"},
+                               "ADP": {"name": "{}_ADP".format(self.population_name),
+                                               "template": "ADP"},
+                               "NADH": {"name": "{}_NADH".format(self.population_name),
+                                                "template": "NADH"},
+                               "NAD+": {"name": "{}_NAD+".format(self.population_name),
+                                                "template": "NAD+"}}
+        self.affected_by_dilution = [self.specific_chems["ATP"]["name"],
+                                     self.specific_chems["NADH"]["name"]]
+        self.protein_fractions = {"other": {"name": "{}_other_proteins".format(self.population_name),
+                                            "membrane": False},
+                                  "replication": {"name": "{}_replication_proteins".format(self.population_name),
+                                                  "membrane": False},
+                                  "NADH deshydrogenase": {"name": "{}_NADH_deshydrogenase".format(self.population_name),
+                                                          "membrane": True},
+                                  "ATP synthase": {"name": "{}_ATP_synthase".format(self.population_name),
+                                                   "membrane": True}}
+        # determine which reactions happen in the cell and which specific chems are involved
+        specific_chems_names = set()
+        for pathway_name, pathway_info in pathways.items():
+            specific_chems_names.update(self.__class__.specific_chem_pat.findall(pathway_info["formula"]))
+            self.protein_fractions[pathway_name] = {"name": "{}_{}_proteins".format(self.population_name, pathway_name.replace(" ", "_")),
+                                                    "membrane": False}
+        for specific_chem in specific_chems_names:
+            if specific_chem not in self.specific_chems:
+                if specific_chem in params["metabolites informations"]:
+                    template = params["metabolites informations"].get(specific_chem).get("template")
+                else:
+                    template = None
+                self.specific_chems[specific_chem] = {"name": "{}_{}".format(self.population_name, specific_chem.replace(" ", "_")),
+                                                      "template": template}
+            self.affected_by_dilution.append(self.specific_chems[specific_chem]["name"])
+        for fraction_name, fraction_info in self.protein_fractions.items():
+            self.specific_chems[fraction_name] = {"name": fraction_info["name"],
+                                                  "template": None}
+            self.affected_by_dilution.append(fraction_info["name"])
+
+    def register_chems(self, indexes, chems_list, specific_reactions):
+        self.chems_list = chems_list
+        self.pathways = specific_reactions
+
+        for pathway in self.pathways:
+            # most metabolic reactions involve metabolites; the parameters of
+            # the reactions refer to them generically. Those generic references
+            # must be changed to specific references
+            pathway.parameters["Km"] = {(chem in self.specific_chems and self.specific_chems[chem]["name"] or chem): km
+                                        for chem, km
+                                        in pathway.parameters["Km"].items()}
+            self.FD.prepare(pathway)
+            self.FT.prepare(pathway)
+        self.indexes = indexes
+
+    def get_derivatives(self, expanded_y, T, tracker):
+        return NotImplemented
+
+    def set_initial_concentrations(self, y0):
+        # initially give the same concentration for every fraction
+        nbof_fractions = len(self.protein_fractions)
+        initial_fraction_concentration = self.X0 / nbof_fractions
+        for fraction_info in self.protein_fractions.values():
+            y0[self.chems_list.index(fraction_info["name"])] = initial_fraction_concentration
+        # initially give the same concentration for every metabolite and proteins
+        for specific_chem_info in self.specific_chems.values():
+            y0[self.chems_list.index(specific_chem_info["name"])] = self.initial_metabolite_concentration
+        # conserved moieties are given "physiological" concentrations
+        y0[self.chems_list.index(self.specific_chems["ATP"]["name"])] = self.X0 * self.AXP_per_P * (self.initial_ATP_ADP_ratio / (1 + self.initial_ATP_ADP_ratio))
+        y0[self.chems_list.index(self.specific_chems["ADP"]["name"])] = self.X0 * self.AXP_per_P * (1 / (1 + self.initial_ATP_ADP_ratio))
+        y0[self.chems_list.index(self.specific_chems["NAD+"]["name"])] = self.X0 * self.NADX_per_P * (self.initial_NAD_NADH_ratio / (1 + self.initial_NAD_NADH_ratio))
+        y0[self.chems_list.index(self.specific_chems["NADH"]["name"])] = self.X0 * self.NADX_per_P * (1 / (1 + self.initial_NAD_NADH_ratio))
+        return y0
+
+    def get_index_of_specific_chems_unaffected_by_dilution(self):
+        return [self.chems_list.index(chem_info["name"])
+                for chem_kind, chem_info
+                in self.specific_chems.items()
+                if chem_kind not in self.affected_by_dilution]
+
+
 class Stahl(GrowthModel):
     """Implementation of a purposefully simple multi-pathway growth model.
     The rate of a pathway i is `rcat_i = [X] * FD * FT`
@@ -102,7 +208,7 @@ class Stahl(GrowthModel):
     - electron donor: the name of the electron donor
     - m: a factor to multiply the threshold energy to adjust it by pathway
     """
-    def __init__(self, population_name, chems_list, reactions, params):
+    def __init__(self, population_name, chems_list, reactions, pathways, params):
         self.population_name = population_name
         self.chems_list = chems_list
         # take the specific parameters of the model
@@ -199,7 +305,7 @@ class SimpleGrowthModel(GrowthModel):
     - norm: the chemical species by which the yield on the pathway is normalized
     (The "s" of the Yx/s. Usually the electron donor)
     """
-    def __init__(self, population_name, chems_list, reactions, params):
+    def __init__(self, population_name, chems_list, reactions, reactions_from_config, params):
         self.population_name = population_name
         self.chems_list = chems_list
         # take the specific parameters of the model
@@ -459,6 +565,7 @@ _rates_dict = {"MM": MM_kinetics,
                "JinBethkeFT": JinBethkeFT,
                "LaRowe2012FT": LaRowe2012FT}
 
-growth_models_dict = {"SimpleGrowthModel": SimpleGrowthModel,
+growth_models_dict = {"Objectiveless": ObjectivelessModel,
+                      "SimpleGrowthModel": SimpleGrowthModel,
                       "Stahl": Stahl,
                       }
