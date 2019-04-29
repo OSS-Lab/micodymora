@@ -368,7 +368,7 @@ class SimpleGrowthModel(GrowthModel):
                                for pathway in self.pathways)
         JG = rcat * dG
         # rate of energy intake from the environment
-        ran = JG / self.energy_barriers
+        ran = JG / np.clip(self.energy_barriers - self.anabolism.dG(y, T), a_max=-1, a_min=None)
         # each pathway is associated with a anabolism and catabolism stoichiometry
         metabolism = np.dot(rcat, self.reaction_matrix) + np.dot(ran, self.anabolism_stoichiometry_vector)
         derivatives = X * metabolism
