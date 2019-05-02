@@ -297,6 +297,8 @@ class SimpleGrowthModel(GrowthModel):
     - anabolism: name of the population's reaction which is the anabolic reaction
     - biomass: the specie to be considered as biomass in the anabolic equation
     (kJ.molX-1, negative)
+    - decay: negative exponential biomass decay coefficient (positive number, hour-1)
+      decay contribution to dX/dt: -decay * X
     
     The following parameters must be defined for each pathway;
     - vmax: maximum catalytic rate
@@ -309,6 +311,7 @@ class SimpleGrowthModel(GrowthModel):
         self.chems_list = chems_list
         # take the specific parameters of the model
         self.X0 = params["X0"] # initial biomass concentration
+        self.decay = params["decay"] # negative exponential decay coefficient
         self.biomass = params["biomass"]
         self.anabolism = params["anabolism"]
         # all the reactions which are not the anabolic reaction are considered
@@ -368,7 +371,7 @@ class SimpleGrowthModel(GrowthModel):
                                for pathway in self.pathways)
         JG = rcat * dG
         # rate of energy intake from the environment
-        ran = JG / np.clip(self.energy_barriers - self.anabolism.dG(y, T), a_max=-1, a_min=None)
+        ran = JG / np.clip(self.energy_barriers - self.anabolism.dG(y, T), a_max=-1, a_min=None) - self.decay * X / len(self.pathways)
         # each pathway is associated with a anabolism and catabolism stoichiometry
         metabolism = np.dot(rcat, self.reaction_matrix) + np.dot(ran, self.anabolism_stoichiometry_vector)
         derivatives = X * metabolism
