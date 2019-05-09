@@ -28,9 +28,10 @@ class Molecule(Chem):
     '''Chemical specie with a defined chemical formula'''
     element_pat = re.compile("([A-Z](?:[a-z]*))([0-9]*)")
 
-    def __init__(self, name, formula, dGf0):
+    def __init__(self, name, formula, dGf0, dHf0=None):
         super().__init__(name)
         self.dGf0 = dGf0
+        self.dHf0 = dHf0
         for element, amount in self.__class__.element_pat.findall(formula):
             self.composition[element] = amount and int(amount) or 1
         # charge was already infered from the name in Chem.__init__
@@ -60,12 +61,24 @@ class Molecule(Chem):
     def copy(self, name=None):
         return Molecule(name or self.name, self.formula(), self.dGf0)
 
-def load_chems_dict(path):
+def load_chems_dict(path, dHf0_data_path=None):
+    dHf0_data = dict()
+    if dHf0_data_path:
+        with open(dHf0_data_path, "r") as dHf0_fh:
+            next(dHf0_fh)
+            for line in dHf0_fh:
+                if not line.startswith("#"):
+                    name, dHf0, source = line.rstrip().split(",")
+                    if dHf0 == "unknown":
+                        dHf0_data[name] = None
+                    else:
+                        dHf0_data[name] = float(dHf0)
+
     with open(path, "r") as chems_fh:
         next(chems_fh)
         chems_dict = dict()
         for line in chems_fh:
             if not line.startswith("#"):
                 name, formula, dGf0, source = line.rstrip().split(",")
-                chems_dict[name] = Molecule(name, formula, float(dGf0))
+                chems_dict[name] = Molecule(name, formula, float(dGf0), dHf0=dHf0_data.get(name))
     return chems_dict

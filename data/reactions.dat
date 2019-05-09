@@ -1,8 +1,8 @@
 acetogenesis: Lac(-) + 2H2O --> Ac(-) + 2H2(aq) + HCO3- + H+
 sulfatotrophic acetogenesis: 2Lac(-) + SO4-2 --> 2Ac(-) + 2HCO3- + H2S(aq)
 sulfatotrophic H2 oxidation: 4H2(aq) + SO4-2 + 2H+ --> H2S(aq) + 4H2O
-hydrogenotrophic methanogenesis: CO2(aq) + 4H2(aq) --> CH4(aq) + 2H2O
-acetoclastic methanogenesis: Ac(-) + H+ --> CH4(aq) + CO2(aq)
+hydrogenotrophic methanogenesis: 0.25HCO3- + H2(aq) + 0.25H+ --> 0.25CH4(aq) + 0.75H2O
+acetoclastic methanogenesis: Ac(-) + H2O --> CH4(aq) + HCO3-
 hybrid methanogenesis: Ac(-) + 4H2(aq) + H+ --> 2CH4(aq) + 2H2O
 acetate sulfate respiration: SO4-2 + Ac(-) + H+ --> H2S(aq) + 2HCO3-
 glycerol respiration: Gly + 3.5O2(aq) --> 3CO2(g) + 4H2O

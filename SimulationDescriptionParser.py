@@ -6,7 +6,7 @@
 
 from micodymora.Nesting import aggregate
 from micodymora.Chem import Chem, load_chems_dict
-from micodymora.Reaction import Reaction, MetabolicReaction, load_reactions_dict
+from micodymora.Reaction import Reaction, MetabolicReaction, SimBioReaction, load_reactions_dict
 from micodymora.Equilibrium import SystemEquilibrator, load_equilibria_dict
 from micodymora.GLT import load_glt_dict, SimulationGasLiquidTransfer, SystemGasLiquidTransfers
 from micodymora.Community import Community
@@ -21,6 +21,7 @@ import re
 
 module_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data")
 default_chems_description_path = os.path.join(module_path, "chems.csv")
+default_dHf0_description_path = os.path.join(module_path, "dHf0.csv")
 default_reactions_description_path = os.path.join(module_path, "reactions.dat")
 default_equilibria_description_path = os.path.join(module_path, "equilibria.dat")
 default_glt_description_path = os.path.join(module_path, "gas_liquid_transfer.dat")
@@ -89,12 +90,13 @@ def outline_systems_chemistry(input_file):
     '''
     # see if chems or reaction dictionary is overriden
     chems_description_path = input_file.get("chems_description_path", default_chems_description_path)
+    dHf0_description_path = input_file.get("dHf0_description_path", default_dHf0_description_path)
     reactions_description_path = input_file.get("reactions_description_path", default_reactions_description_path)
     equilibria_description_path = input_file.get("equilibria_description_path", default_equilibria_description_path)
     glt_description_path = input_file.get("glt_description_path", default_glt_description_path)
     
     # load the chems and reactions dict
-    chems_dict = load_chems_dict(chems_description_path)
+    chems_dict = load_chems_dict(chems_description_path, dHf0_description_path)
     reactions_dict = load_reactions_dict(chems_description_path, reactions_description_path)
     equilibria_dict = load_equilibria_dict(chems_description_path, equilibria_description_path)
     glt_dict = load_glt_dict(chems_description_path, glt_description_path)
@@ -225,6 +227,20 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
             reaction = reaction.new_SimBioReaction(chems_list, reaction_info["parameters"])
             population_specific_reactions.append(reaction)
         population.register_chems(specific_indexes[population.population_name], chems_list, population_specific_reactions)
+
+    missing_enthalpies = set()
+    for population in population_instances:
+        for pathway in population.pathways:
+            for reagent in pathway.reagents:
+                dHf0 = chems_dict[reagent.name].dHf0
+                if dHf0 is None:
+                    missing_enthalpies |= {reagent.name}
+    if missing_enthalpies:
+        print("Cannot use correction of Gibbs energy for non-standard temperature: missing enthalpy data for the following species: {}".format(missing_enthalpies))
+        print("Gibbs energy will be computed as dGr0 + RT ln Q")
+    else:
+        # WARNING: untested
+        SimBioReaction.dG = SimBioReaction.dGT
 
     return chems_list, nesting, chems_dict, population_instances
         

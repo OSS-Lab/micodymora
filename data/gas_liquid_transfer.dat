@@ -1,8 +1,8 @@
-name,liquid,gas,H0cp (M.atm-1),Hsol/R (K)
-CO2,CO2(aq),CO2(g),3.4e-2,2400
-H2,H2(aq),H2(g),7.8e-4,500
-O2,O2(aq),O2(g),1.3e-3,1700
-CH4,CH4(aq),CH4(g),1.43e-3,1600
-H2S,H2S(aq),H2S(g),1.0e-1,2100
-NH3,NH3(aq),NH3(g),5.9e+1,4200
-N2,N2(aq),N2(g),6.4e-4,1600
+name,liquid,gas,H0cp (M.m-3.Pa-1),Hsol/R (K)
+CO2,CO2(aq),CO2(g),3.4e-4,2400
+H2,H2(aq),H2(g),7.8e-6,500
+O2,O2(aq),O2(g),1.3e-5,1700
+CH4,CH4(aq),CH4(g),1.43e-5,1600
+H2S,H2S(aq),H2S(g),1.0e-3,2100
+NH3,NH3(aq),NH3(g),5.9e-1,4200
+N2,N2(aq),N2(g),6.4e-6,1600

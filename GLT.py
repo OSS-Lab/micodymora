@@ -23,7 +23,7 @@ The transfer rate from gas to liquid is
 
 with kla the volumetric mass transfer coefficient (h-1), L the concentration of
 species in the liquid phase (M), G the concentration of species in the gas
-phase (atm) and H the Henry constant (M.atm-1).
+phase (M) and H the Henry constant (Mliq.Mgas-1).
 
 # Gas outflow rate
 
@@ -53,7 +53,7 @@ then liquids transfers back to gas and goes negative again, and the cycle
 repeats).
 """
 
-from micodymora.Constants import T0
+from micodymora.Constants import T0, R
 from micodymora.Chem import load_chems_dict
 
 import numpy as np
@@ -62,7 +62,7 @@ class GasLiquidTransfer:
     def __init__(self, gas_chem, liquid_chem, H0cp, Hsol):
         '''
         * reaction: Reaction instance
-        * H0cp: Henry constant (M.atm-1) in standard conditions
+        * H0cp: Henry constant (Mliq.Mgas-1) in standard conditions
         * Hsol: Enthalpy of solution over R (K)'''
         self.gas_chem = gas_chem
         self.liquid_chem = liquid_chem
@@ -97,9 +97,10 @@ class SimulationGasLiquidTransfer(GasLiquidTransfer):
         Cg = C[self.gas_index]
         Cl = C[self.liquid_index]
         H = self.H0cp * np.exp(self.Hsol * (1/T - 1/T0))
-        return self.kla * (Cl - Cg * H)
+        return self.kla * (Cl - Cg * H * R * T)
 
-    def get_partial_pressure(self, C):
+    def get_gas_concentration(self, C):
+        """return the concentration of the gas species (which is in mol.L-1)"""
         return C[self.gas_index]
 
     @classmethod
@@ -113,7 +114,7 @@ class SystemGasLiquidTransfers:
         * transfers: list of SimulationGasLiquidTransfer instances
         * vliq: volume of liquid phase (L)
         * vgas: volume of gas phase (L)
-        * headspace_pressure: headspace space (atm)
+        * headspace_pressure: headspace space (Pa)
         * alpha: coefficient characterizing the outflow from the gas phase
           through a valve'''
         self.transfers = transfers
@@ -133,9 +134,12 @@ class SystemGasLiquidTransfers:
 
     def get_rates(self, C, T, tracker):
         equilibration_rate = np.hstack(transfer.get_rate(C, T, tracker) for transfer in self.transfers) * self.vliq / self.vgas
-        # should also account for water vapour pressure. Ignored for the moment
         # gas outflow through a valve (only enabled if the alpha parameter is set to a non-zero value)
-        total_gas_pressure = sum(transfer.get_partial_pressure(C) for transfer in self.transfers)
+        # total pressure (in Pa) is computed by summing individual pressures,
+        # which are computed from individual gas concentrations multiplied by RT
+        # to convert them to J.L-1 then multiplied by 1e3 to be in J.m-3 (Pa)
+        total_gas_pressure = sum(transfer.get_gas_concentration(C) * R * T * 1e3 for transfer in self.transfers)
+        # NOTE: the water vapour pressure should be accounted for but is ignored for the moment
         gas_outflow_rate = np.array([self.alpha * (total_gas_pressure - self.headspace_pressure) * (total_gas_pressure > self.headspace_pressure)]) 
         return np.hstack([equilibration_rate, gas_outflow_rate])
 

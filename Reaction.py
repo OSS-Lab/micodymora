@@ -1,5 +1,5 @@
 from micodymora.Chem import load_chems_dict
-from micodymora.Constants import Rkj
+from micodymora.Constants import Rkj, T0
 
 import re
 import numbers
@@ -7,6 +7,12 @@ import collections
 import numpy as np
 
 import pdb
+
+class UndefinedQuantity:
+    '''This class represents a quantity which has a physical meaning, but which
+    cannot be represented by a number in a specific case because informations
+    are lacking. For example, the enthalpy differential of a reaction.'''
+    pass
 
 class ImbalancedReactionException(Exception):
     pass
@@ -17,6 +23,10 @@ class Reaction:
         self.reagents = reagents
         self.name = name
         self.dG0 = sum(chem.dGf0 * stoichiometry for chem, stoichiometry in self.reagents.items())
+        try:
+            self.dH0 = sum(chem.dHf0 * stoichiometry for chem, stoichiometry in self.reagents.items())
+        except TypeError:
+            self.dH0 = UndefinedQuantity
 
     def K(self, T):
         '''equilibrium constant of the reaction'''
@@ -327,6 +337,18 @@ class SimBioReaction(Reaction):
         * C: concentrations vector (mol.L-1)
         * T: temperature (K)'''
         return self.dG0 + Rkj * T * self.lnQ(C)
+
+    def dGT(self, C, T):
+        '''Compute Gibbs energy differential for non-standard conditions of
+        temperature and concentrations, in kJ.mol-1. Applies the correction
+        for non-standard temperature which is the solution for the
+        Gibbs-Helmoltz equation, as explained in Hanselmann 1991.
+        This formula requires the enthalpy of formation of every reagent to
+        be known.
+        * C: concentrations vector (mol.L-1)
+        * T: temperature (K)'''
+        assert self.dH0 is not UndefinedQuantity
+        return self.dG0 * T / T0 + self.dH0 * (T0 - T) / T0
 
     def get_vector(self, C, T):
         '''Returns the reaction's stoichiometric vector, containing values in
