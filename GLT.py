@@ -70,13 +70,15 @@ class GasLiquidTransfer:
         self.Hsol = Hsol
 
 class SimulationGasLiquidTransfer(GasLiquidTransfer):
-    def __init__(self, gas_chem, liquid_chem, H0cp, Hsol, chems_list, kla):
+    def __init__(self, gas_chem, liquid_chem, H0cp, Hsol, chems_list, kla, vliq, vgas):
         '''
         * reaction: Reaction instance. Is upgraded to a SimulationReaction
         instance during the instanciation.
         * kla: gas/liquid transfer rate constant (day-1)
         * chems_list: list of the name of the chemical species involved in
         the simulation, in the same order as in the concentration vector
+        * vliq: volume of the liquid phase of the system
+        * vgas: volume of the gas phase of the system
         '''
         # first initialise the instance as a GasLiquidTransfer
         super().__init__(gas_chem, liquid_chem, H0cp, Hsol)
@@ -86,7 +88,7 @@ class SimulationGasLiquidTransfer(GasLiquidTransfer):
         self.gas_index = chems_list.index(self.gas_chem.name)
         self.liquid_index = chems_list.index(self.liquid_chem.name)
         self.stoichiometry_vector = np.zeros(len(chems_list))
-        self.stoichiometry_vector[self.gas_index] = 1
+        self.stoichiometry_vector[self.gas_index] = 1 * vliq / vgas
         self.stoichiometry_vector[self.liquid_index] = -1
         
     def get_vector(self):
@@ -104,9 +106,9 @@ class SimulationGasLiquidTransfer(GasLiquidTransfer):
         return C[self.gas_index]
 
     @classmethod
-    def from_GasLiquidTransfer(cls, glt, chems_list, kla):
+    def from_GasLiquidTransfer(cls, glt, chems_list, kla, vliq, vgas):
         '''Constructor from GasLiquidTransfer'''
-        return cls(glt.gas_chem, glt.liquid_chem, glt.H0cp, glt.Hsol, chems_list, kla)
+        return cls(glt.gas_chem, glt.liquid_chem, glt.H0cp, glt.Hsol, chems_list, kla, vliq, vgas)
 
 class SystemGasLiquidTransfers:
     def __init__(self, chems_list, transfers, vliq, vgas, headspace_pressure, alpha):
@@ -133,7 +135,7 @@ class SystemGasLiquidTransfers:
         return np.vstack([gl_transfers, self.gas_outflow_vector])
 
     def get_rates(self, C, T, tracker):
-        equilibration_rate = np.hstack(transfer.get_rate(C, T, tracker) for transfer in self.transfers) * self.vliq / self.vgas
+        equilibration_rate = np.hstack(transfer.get_rate(C, T, tracker) for transfer in self.transfers)
         # gas outflow through a valve (only enabled if the alpha parameter is set to a non-zero value)
         # total pressure (in Pa) is computed by summing individual pressures,
         # which are computed from individual gas concentrations multiplied by RT

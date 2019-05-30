@@ -260,16 +260,16 @@ def get_initial_concentrations(input_file, chems_list, nesting, populations):
 def get_system_glt(input_file, glt_dict, chems_list):
     # get list of SimulationGasLiquidTransfer instances
     gl_info = input_file.get("gas-liquid interface")
-    if gl_info:
-        glts = [SimulationGasLiquidTransfer.from_GasLiquidTransfer(glt_dict[glt], chems_list, kla)
-                for glt, kla
-                in (gl_info.get("transfers") or {}).items()]
-    else:
-        glts = []
     vliq = gl_info.get("vliq", 1)
     vgas = gl_info.get("vgas", 1)
     headspace_pressure = gl_info.get("headspace pressure", 1)
     alpha = gl_info.get("alpha", 0)
+    if gl_info:
+        glts = [SimulationGasLiquidTransfer.from_GasLiquidTransfer(glt_dict[glt], chems_list, kla, vliq, vgas)
+                for glt, kla
+                in (gl_info.get("transfers") or {}).items()]
+    else:
+        glts = []
     return SystemGasLiquidTransfers(chems_list, glts, vliq, vgas, headspace_pressure, alpha)
 
 def get_simulation(input_file, logger=None, progress_tracker=None, check_uninitialized_sets=True):
