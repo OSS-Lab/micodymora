@@ -85,8 +85,8 @@ def outline_systems_chemistry(input_file):
     the chemical reactions and equilibria that are supposed to happen in the
     system, and it decides which chemical specie shall be present in the
     concentration vector of the simulation, and in which order.
-    Solving this problem implies to update the chems dictionary (because new
-    chems are created to represent populations' biomass).
+    Solving this problem implies to update the chems dictionary (because new chems are created
+    to represent populations' biomass)
     '''
     # see if chems or reaction dictionary is overriden
     chems_description_path = input_file.get("chems_description_path", default_chems_description_path)
@@ -149,6 +149,8 @@ def get_catabolic_reactions(input_file, chems_dict, reactions_dict):
 # This function parses the populations definitions in order to create the
 # GrowthModel instances (which actually represent the populations).
 def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting):
+    # temporary gas mask
+    gas_species = np.array([chems_dict[species].phase == "g" and 1 or 0 for species in chems_list])
     population_instances = list()
     specific_reactions = dict() # {population name: {reaction name: {formula: str, parameters: list}}}
     specific_indexes = dict() # {population name: {generic chem name: index}}
@@ -185,7 +187,7 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
                 else:
                     raise ValueError("unknown reaction \"{}\" and no formula provided".format(reaction_name))
             if is_a_generic_formula:
-                simbioreaction = reaction.new_SimBioReaction(chems_list, reaction_parameters)
+                simbioreaction = reaction.new_SimBioReaction(chems_list, gas_species, reaction_parameters)
                 generic_reactions.append(simbioreaction)
         # instanciate the population
         growth_model_name = population.get("growth model").get("name")
@@ -215,8 +217,14 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
         population_instances.append(growth_model)
         specific_indexes[population_name] = indexes
     # Now all populations have been scanned, the chems_list is complete
-    # Give to the knowledge of the chems_list to specific reactions and populations
+    # Give to the knowledge of the chems_list to specific reactions and populations.
+    # definitive gas mask
+    gas_species = np.array([chems_dict[species].phase == "g" and 1 or 0 for species in chems_list])
     for population in population_instances:
+        # update gas species vector for every pathway reactions
+        for reaction in population.pathways:
+            reaction.gas_species = gas_species
+        # instanciate the specific reactions
         population_specific_reactions = list()
         for reaction_name, reaction_info in specific_reactions[population.population_name].items():
             # convert the local names in the specific reactions formulas into their global counterpart
@@ -224,7 +232,7 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
             specific_chems_dict = {local_name: infos["name"] for local_name, infos in population.specific_chems.items()}
             formula = reaction_info["formula"].format(**specific_chems_dict)
             reaction = Reaction.from_string(chems_dict, formula, name=reaction_name)
-            reaction = reaction.new_SimBioReaction(chems_list, reaction_info["parameters"])
+            reaction = reaction.new_SimBioReaction(chems_list, gas_species, reaction_info["parameters"])
             population_specific_reactions.append(reaction)
         population.register_chems(specific_indexes[population.population_name], chems_list, population_specific_reactions)
 
@@ -239,7 +247,6 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
         print("Cannot use correction of Gibbs energy for non-standard temperature: missing enthalpy data for the following species: {}".format(missing_enthalpies))
         print("Gibbs energy will be computed as dGr0 + RT ln Q")
     else:
-        # WARNING: untested
         SimBioReaction.dG = SimBioReaction.dGT
 
     return chems_list, nesting, chems_dict, population_instances

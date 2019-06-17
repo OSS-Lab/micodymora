@@ -102,10 +102,10 @@ class Reaction:
         factor = abs(self.reagents[chem])
         self.reagents = {chem: coef / factor for chem, coef in self.reagents.items()}
 
-    def new_SimBioReaction(self, chems_list, parameters):
+    def new_SimBioReaction(self, chems_list, gas_species, parameters):
         '''Return a SimBioReaction instance based on the current Reaction
         instance'''
-        return SimBioReaction(self.reagents, chems_list, parameters, name=self.name)
+        return SimBioReaction(self.reagents, chems_list, gas_species, parameters, name=self.name)
 
     def __mul__(self, factor):
         '''Implement multiplication of reaction's stoichiometry by a numeric factor
@@ -272,14 +272,16 @@ class MetabolicReaction(SimulationReaction):
 
 # this class is meant to ultimately replace SimulationReaction and MetabolicReaction
 class SimBioReaction(Reaction):
-    def __init__(self, reagents, chems_list, parameters, name=None):
+    def __init__(self, reagents, chems_list, gas_species, parameters, name=None):
         '''
         * reagents: {Chem: stoichiometry} dict
         * chems_list: list of the name of the chemical species (as strings)
         in the same order as in the concentrations vector
+        * gas_species: boolean vector indicating whether a species is a gas or not
         '''
         super().__init__(reagents, name=name)
         self.chems_list = chems_list
+        self.gas_species = gas_species
         self.stoichiometry_vector = np.zeros(len(self.chems_list))
         self.update_chems_list(chems_list) # the stoichiometry vector is set here
         self.parameters = parameters
@@ -321,11 +323,15 @@ class SimBioReaction(Reaction):
     def lnQ(self, C):
         '''Natural logarithm of the mass action ratio of the reaction.
         * C: concentrations vector (mol.L-1)'''
+        total_gas_mol = sum(self.gas_species * C)
+        # convert gas species concentration to partial pressure
+        # leave non-gas species as they are (mol.L-1)
+        C_partial = C / ((1 ^ self.gas_species) + self.gas_species * total_gas_mol)
         # set null or negative concentrations to machine epsilon
-        C = np.clip(C, np.finfo(float).eps, None)
+        C_clipped = np.clip(C_partial, np.finfo(float).eps, None)
         return sum(stoich * np.log(conc)
                     for stoich, conc
-                    in zip(self.stoichiometry_vector, C))
+                    in zip(self.stoichiometry_vector, C_clipped))
 
     def disequilibrium(self, C, T):
         '''Mass action ratio divided by equilibrium constant (Q/K)'''
@@ -364,7 +370,7 @@ class SimBioReaction(Reaction):
 
     def __mul__(self, factor):
         new_reaction = super().__mul__(factor)
-        return new_reaction.new_SimBioReaction(self.chems_list, self.parameters)
+        return new_reaction.new_SimBioReaction(self.chems_list, self.gas_species, self.parameters)
 
     def __rmul__(self, factor):
         return self.__mul__(factor)
@@ -375,7 +381,7 @@ class SimBioReaction(Reaction):
         if isinstance(operand, SimBioReaction):
             assert self.chems_list == operand.chems_list
         new_reaction = super().__add__(operand)
-        return new_reaction.new_SimBioReaction(self.chems_list, self.parameters)
+        return new_reaction.new_SimBioReaction(self.chems_list, self.gas_species, self.parameters)
 
 def load_reactions_dict(chems_path, reactions_path):
     chems_dict = load_chems_dict(chems_path)
