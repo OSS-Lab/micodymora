@@ -7,6 +7,7 @@ class Chem:
     # Their charge can be non-null so chems such as NAD+ can be described
     # correctly in this regard
     charge_pat = re.compile("([+-])([0-9]*)$")
+    phase_pat = re.compile("\((aq|g|s)\)")
 
     def __init__(self, name, charge=0):
         self.name = name
@@ -17,6 +18,8 @@ class Chem:
             self.composition["charge"] = int(sign + (charge or "1"))
         else:
             self.composition["charge"] = 0
+        phase_tag = self.__class__.phase_pat.findall(name)
+        self.phase = phase_tag and phase_tag[0] or None
 
     def copy(self, name=None):
         return Chem(name or self.name, self.charge)

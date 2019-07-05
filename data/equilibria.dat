@@ -5,3 +5,4 @@ phosphate: H3PO4 H2PO4- HPO4-2 PO4-3: 1.79 6.95 12.89
 carbonate: CO2(aq) HCO3- CO3-2: 6.35 10.33
 hydrosulfide: H2S(aq) HS-: 7.00
 ammonium: NH4+ NH3(aq): 9.25
+sulfate: HSO4- SO4-2: 1.99
