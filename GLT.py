@@ -131,11 +131,11 @@ class SystemGasLiquidTransfers:
             self.gas_outflow_vector[transfer.gas_index] = -1
 
     def get_matrix(self):
-        gl_transfers = np.vstack(transfer.get_vector() for transfer in self.transfers) 
+        gl_transfers = np.vstack([transfer.get_vector() for transfer in self.transfers]) 
         return np.vstack([gl_transfers, self.gas_outflow_vector])
 
     def get_rates(self, C, T, tracker):
-        equilibration_rate = np.hstack(transfer.get_rate(C, T, tracker) for transfer in self.transfers)
+        equilibration_rate = np.hstack([transfer.get_rate(C, T, tracker) for transfer in self.transfers])
         # gas outflow through a valve (only enabled if the alpha parameter is set to a non-zero value)
         # total pressure (in Pa) is computed by summing individual pressures,
         # which are computed from individual gas concentrations multiplied by RT

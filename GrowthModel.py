@@ -339,7 +339,7 @@ class SimpleGrowthModel(GrowthModel):
         self.decay_reaction = next(reaction for reaction in specific_reactions if reaction.name == "decay")
         # save a vector of the anabolic reaction stoichiometry that have the right shape for numpy computations
         # (the anabolic stoichiometry vector duplicated for each pathway and stacked into rows)
-        self.anabolism_stoichiometry_vector = np.row_stack(self.anabolism.stoichiometry_vector for i in range(len(self.pathways)))
+        self.anabolism_stoichiometry_vector = np.row_stack([self.anabolism.stoichiometry_vector for i in range(len(self.pathways))])
         # update the stoichiometry vector of the reactions
         for pathway in self.pathways:
             pathway.update_chems_list(self.chems_list)
@@ -349,9 +349,9 @@ class SimpleGrowthModel(GrowthModel):
         self.decay_reaction.update_chems_list(self.chems_list)
 
         # store the catabolism matrix now we know the length of the vectors
-        self.reaction_matrix = np.row_stack(pathway.stoichiometry_vector
-                                            for pathway
-                                            in self.pathways)
+        self.reaction_matrix = np.row_stack([pathway.stoichiometry_vector
+                                             for pathway
+                                             in self.pathways])
 
     def get_index_of_specific_chems_unaffected_by_dilution(self):
         return [self.chems_list.index(chem_info["name"])
@@ -368,9 +368,9 @@ class SimpleGrowthModel(GrowthModel):
 
     def get_derivatives(self, y, T, tracker):
         X = y[self.X]
-        dG = np.column_stack(pathway.dG(y, T) for pathway in self.pathways)
-        rcat = np.column_stack(self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
-                               for pathway in self.pathways)
+        dG = np.column_stack([pathway.dG(y, T) for pathway in self.pathways])
+        rcat = np.column_stack([self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
+                               for pathway in self.pathways])
         JG = rcat * dG
         # rate of energy intake from the environment
         ran = JG / np.clip(self.energy_barriers - self.anabolism.dG(y, T), a_max=-1, a_min=None)
