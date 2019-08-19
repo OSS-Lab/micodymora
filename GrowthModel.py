@@ -369,8 +369,8 @@ class SimpleGrowthModel(GrowthModel):
     def get_derivatives(self, y, T, tracker):
         X = y[self.X]
         dG = np.column_stack([pathway.dG(y, T) for pathway in self.pathways])
-        rcat = np.column_stack([self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T)
-                               for pathway in self.pathways])
+        rcat = np.column_stack([max(self.FD.rate(pathway, y, T) * self.FT.rate(pathway, y, T), 0)
+                                for pathway in self.pathways])
         JG = rcat * dG
         # rate of energy intake from the environment
         ran = JG / np.clip(self.energy_barriers - self.anabolism.dG(y, T), a_max=-1, a_min=None)
