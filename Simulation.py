@@ -135,7 +135,6 @@ class Simulation:
         * t: time (in hour)
         * y: concentration vector (aggregated) (in M)
         '''
-        print(t)
         y = np.clip(y, 0, None)
         expanded_y = np.array(self.equilibrate(y))
         # derivatives caused by biological reactions
