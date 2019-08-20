@@ -135,6 +135,7 @@ class Simulation:
         * t: time (in hour)
         * y: concentration vector (aggregated) (in M)
         '''
+        print(t)
         y = np.clip(y, 0, None)
         expanded_y = np.array(self.equilibrate(y))
         # derivatives caused by biological reactions
@@ -173,7 +174,7 @@ class Simulation:
     def solve(self, time, dt):
         t = np.arange(0, time, dt)
         solver = ode(self.f)
-        solver.set_integrator("lsoda", atol=self.atol)
+        solver.set_integrator("lsoda", atol=self.atol, nsteps=5000)
         solver.set_initial_value(self.y0)
         self.progress_tracker.set_total_time(time)
         expanded_y = self.equilibrate(self.y0)
