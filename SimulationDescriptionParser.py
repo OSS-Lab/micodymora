@@ -97,7 +97,7 @@ def outline_systems_chemistry(input_file):
     
     # load the chems and reactions dict
     chems_dict = load_chems_dict(chems_description_path, dHf0_description_path)
-    reactions_dict = load_reactions_dict(chems_description_path, reactions_description_path)
+    reactions_dict = load_reactions_dict(chems_description_path, reactions_description_path, dHf0_path=default_dHf0_description_path)
     equilibria_dict = load_equilibria_dict(chems_description_path, equilibria_description_path)
     glt_dict = load_glt_dict(chems_description_path, glt_description_path)
  
@@ -217,7 +217,7 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
         population_instances.append(growth_model)
         specific_indexes[population_name] = indexes
     # Now all populations have been scanned, the chems_list is complete
-    # Give to the knowledge of the chems_list to specific reactions and populations.
+    # Give the knowledge of the chems_list to specific reactions and populations.
     # definitive gas mask
     gas_species = np.array([chems_dict[species].phase == "g" and 1 or 0 for species in chems_list])
     for population in population_instances:
@@ -238,8 +238,8 @@ def register_biomass(input_file, chems_dict, reactions_dict, chems_list, nesting
 
     missing_enthalpies = set()
     for population in population_instances:
-        for pathway in population.pathways:
-            for reagent in pathway.reagents:
+        for reaction in population.all_reactions:
+            for reagent in reaction.reagents:
                 dHf0 = chems_dict[reagent.name].dHf0
                 if dHf0 is None:
                     missing_enthalpies |= {reagent.name}

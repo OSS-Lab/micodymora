@@ -13,6 +13,8 @@ class GrowthModel(abc.ABC):
     Required attributes:
     * specific_chems: name of the specific chems for an instanciated population.
     * affected_by_dilution: boolean vector specifying whether the specific
+    * all_reactions: a list of all the reactions catalyzed by the population
+      (this attribute can be produced only after `register_chem` has been called)
     chems of the population are affected by the chemostat's dilution rate or not
     '''
     def __init__(self, population_name, chems_list, reactions, pathways, params):
@@ -352,6 +354,10 @@ class SimpleGrowthModel(GrowthModel):
         self.reaction_matrix = np.row_stack([pathway.stoichiometry_vector
                                              for pathway
                                              in self.pathways])
+
+        # list of all reactions catalyzed by the population
+        self.all_reactions = self.pathways[:]
+        self.all_reactions += [self.anabolism, self.decay_reaction]
 
     def get_index_of_specific_chems_unaffected_by_dilution(self):
         return [self.chems_list.index(chem_info["name"])

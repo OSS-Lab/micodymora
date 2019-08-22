@@ -383,8 +383,8 @@ class SimBioReaction(Reaction):
         new_reaction = super().__add__(operand)
         return new_reaction.new_SimBioReaction(self.chems_list, self.gas_species, self.parameters)
 
-def load_reactions_dict(chems_path, reactions_path):
-    chems_dict = load_chems_dict(chems_path)
+def load_reactions_dict(chems_path, reactions_path, dHf0_path=None):
+    chems_dict = load_chems_dict(chems_path, dHf0_data_path=dHf0_path)
     with open(reactions_path, "r") as reactions_fh:
         reactions_dict = dict()
         for line in reactions_fh:

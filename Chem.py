@@ -62,7 +62,7 @@ class Molecule(Chem):
         return formula_string
 
     def copy(self, name=None):
-        return Molecule(name or self.name, self.formula(), self.dGf0)
+        return Molecule(name or self.name, self.formula(), self.dGf0, dHf0=self.dHf0)
 
 def load_chems_dict(path, dHf0_data_path=None):
     dHf0_data = dict()
