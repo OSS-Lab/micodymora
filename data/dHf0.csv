@@ -2,10 +2,10 @@
 H2O,-285.8,Kleerebezem et al. 2010
 H+,0,Kleerebezem et al. 2010
 HO-,-230.0,CRC Handbook of Chemistry and Physics
-H2(aq),unknown,none
+H2(aq),-4.16,deduced from dissolution enthalpy
 H2(g),0,Kleerebezem et al. 2010
 O2(g),0,Kleerebezem et al. 2010
-O2(aq),unknown,none
+O2(aq),-14.13,deduced from dissolution enthalpy
 N2(aq),0,Kleerebezem et al. 2010
 N2(g),0,CRC Handbook of Chemistry and Physics
 NH3(aq),-76.4,Thermal Properties of Uni-Univalent Electrolytes 1965
@@ -13,16 +13,16 @@ NH3(g),-45.9,CRC Handbook of Chemistry and Physics
 NH4+,-133.3,Kleerebezem et al. 2010
 NO2-,-107.0,Kleerebezem et al. 2010
 NO3-,-173.0,Kleerebezem et al. 2010
-CH4(aq),unknown,none
+CH4(aq),61.5,deduced from dissolution enthalpy
 CH4(g),-74.8,Kleerebezem et al. 2010
-CO2(aq),unknown,none
+CO2(aq),373.5,deduced from dissolution enthalpy
 CO2(g),-393.5,Kleerebezem et al. 2010
 H2CO3,unknown,none
 HCO3-,-692.0,Kleerebezem et al. 2010
 CO3-2,-675.23,wikipedia
 SO4-2,-909.6,Kleerebezem et al. 2010
-H2S(aq),unknown,none
-H2S(g),unknown,none
+H2S(aq),3.0,deduced from dissolution enthalpy
+H2S(g),-20.5,Cox Wagman et al 1984
 HS-,-17.6,Kleerebezem et al. 2010
 H3PO4,-1271.7,CRC Handbook of Chemistry and Physics
 H2PO4-,-1296.3,Kleerebezem et al. 2010
