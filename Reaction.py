@@ -345,16 +345,22 @@ class SimBioReaction(Reaction):
         return self.dG0 + Rkj * T * self.lnQ(C)
 
     def dGT(self, C, T):
-        '''Compute Gibbs energy differential for non-standard conditions of
-        temperature and concentrations, in kJ.mol-1. Applies the correction
-        for non-standard temperature which is the solution for the
-        Gibbs-Helmoltz equation, as explained in Hanselmann 1991.
-        This formula requires the enthalpy of formation of every reagent to
-        be known.
+        '''Compute standard state Gibbs energy differential for non-standard
+        conditions of temperature and concentrations, in kJ.mol-1. Applies the
+        correction for non-standard temperature which is the solution for the
+        Gibbs-Helmoltz equation, as explained in Hanselmann 1991.  This formula
+        requires the enthalpy of formation of every reagent to be known.
+        It does not account for the deviation of the value of enthalpies of
+        formation out of the standard conditions of temperature; correcting
+        the enthalpies of formation would indeed require the heat capacity of
+        each chemical species, which is not very easy to come by. Here we stick
+        to Hanselman's assumption that enthalpy of formation does not change
+        much in the temperature range of biological reactions.
         * C: concentrations vector (mol.L-1)
         * T: temperature (K)'''
         assert self.dH0 is not UndefinedQuantity
-        return self.dG0 * T / T0 + self.dH0 * (T0 - T) / T0
+        dG0T = self.dG0 * T / T0 + self.dH0 * (T0 - T) / T0
+        return dG0T + Rkj * T * self.lnQ(C)
 
     def get_vector(self, C, T):
         '''Returns the reaction's stoichiometric vector, containing values in
