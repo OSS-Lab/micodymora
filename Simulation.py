@@ -1,7 +1,7 @@
 from micodymora.Nesting import aggregate
 from micodymora.Spinner import spinner
 
-from scipy.integrate import ode
+from scipy.integrate import ode, odeint, solve_ivp
 import abc
 import numpy as np
 import pandas as pd
@@ -86,6 +86,8 @@ class Simulation:
         * logger: a logger instance inheriting from AbstractLogger
         '''
         self.atol = atol
+        self.endpoint = None # end time for integration
+        self.t = None # current point of the integration
         self.chems_list = chems_list
         self.nesting = nesting
         self.system_equilibrator = system_equilibrator
@@ -135,6 +137,38 @@ class Simulation:
         * t: time (in hour)
         * y: concentration vector (aggregated) (in M)
         '''
+        self.t = t
+        print("\rintegrating: {} hour ".format(spinner(int(t), int(self.endpoint))), end="")
+        y = np.clip(y, 0, None)
+        expanded_y = np.array(self.equilibrate(y))
+        # derivatives caused by biological reactions
+        bio_derivatives = self.community.get_derivatives(expanded_y, self.T, self.progress_tracker)
+        dy_dt_bio = np.sum(bio_derivatives, axis=0)
+        # derivatives caused by the chemostat
+        dy_dt_chemo = self.D_vector * (self.input - expanded_y)
+        # derivatives caused by gas-liquid transfers
+        glt_rates = self.system_glt.get_rates(expanded_y, self.T, self.progress_tracker)
+        glt_matrix = self.system_glt.get_matrix()
+        glt_rate_matrix = np.matmul(np.diag(glt_rates), glt_matrix)
+        dy_dt_glt = np.sum(glt_rate_matrix, axis=0)
+        dy_dt = dy_dt_bio + dy_dt_chemo + dy_dt_glt
+        return aggregate(dy_dt, self.nesting)
+
+    # This is supposed to be an exact copy of the "normal" f function
+    # except that the arguments are inverted (y before t), so as to
+    # satisfy the signature requirements of odeint. Wrapping the f
+    # function would have seemed more sensible than writing this copy,
+    # however the only reason why odeint integration is kept alongside
+    # other integration modes is speed, while wrapping f would have
+    # increased the number of calls and thus decreased the interest
+    # of keeping odeint as an option.
+    def f_for_odeint(self, y, t):
+        '''The function to integrate.
+        * t: time (in hour)
+        * y: concentration vector (aggregated) (in M)
+        '''
+        self.t = t
+        print("\rintegrating: {} hour ".format(spinner(int(t), int(self.endpoint))), end="")
         y = np.clip(y, 0, None)
         expanded_y = np.array(self.equilibrate(y))
         # derivatives caused by biological reactions
@@ -170,43 +204,58 @@ class Simulation:
         # derivatives
         return np.vstack([bio_derivatives, dy_dt_chemo, dy_dt_glt])
 
-    def solve(self, time, dt):
-        t = np.arange(0, time, dt)
-        solver = ode(self.f)
-        solver.set_integrator("lsoda", atol=self.atol, nsteps=5000)
-        solver.set_initial_value(self.y0)
-        self.progress_tracker.set_total_time(time)
+    # Replacement for the solve function
+    # In this new version, integration is performed once (instead of being done by chunks)
+    # then the results are interpolated on the specified timepoints
+    def solve(self, timepoints, mode="ivp", method="RK45"):
+        self.endpoint = max(timepoints)
+        self.progress_tracker.set_total_time(self.endpoint)
         expanded_y = self.equilibrate(self.y0)
         assert all(y >= 0 for y in expanded_y)
-        ts = [0]
-        ys = [expanded_y]
         self.logger.do_log(self, 0, self.y0, expanded_y)
-
         self.status = simulation_status["is running"]
-        while solver.successful() and solver.t <= time:
-            solver.integrate(solver.t + dt)
+        y0 = np.asarray(self.y0)
+        if mode == "ivp":
+            ivp_ret = solve_ivp(self.f, (0, self.endpoint), y0, t_eval=np.asarray(sorted(timepoints)), method=method)
+            print()
+            print("solve_ivp message: {}".format(ivp_ret.message))
+            ys = ivp_ret.y
+        elif mode == "odeint":
+            ys, opt_out = odeint(self.f_for_odeint, self.y0, timepoints, full_output=True)
+        elif mode == "by-chunk":
+            solver = ode(self.f)
+            solver.set_integrator("lsoda", atol=self.atol, nsteps=5000)
+            solver.set_initial_value(self.y0)
+            self.progress_tracker.set_total_time(self.endpoint)
+            ts = [0]
+            ys = [expanded_y]
+            self.logger.do_log(self, 0, self.y0, expanded_y)
+            timestep_gen = (step for step in np.diff(timepoints))
 
-            expanded_y = self.equilibrate(solver.y)
-
-            ts.append(solver.t)
-            ys.append(expanded_y)
-            self.logger.do_log(self, solver.t, solver.y, expanded_y)
-            self.progress_tracker.update_progress(solver.t)
-            waitbar = spinner(int(solver.t), int(time))
-            print("\rintegrating: {} hour ".format(waitbar), end="")
-        print()
-        if solver.t >= time:
+            self.status = simulation_status["is running"]
+            while solver.successful() and solver.t < self.endpoint:
+                solver.integrate(solver.t + next(timestep_gen))
+                ts.append(solver.t)
+                ys.append(solver.y)
+                expanded_y = self.equilibrate(solver.y)
+                self.logger.do_log(self, solver.t, solver.y, expanded_y)
+                self.progress_tracker.update_progress(solver.t)
+            print()
+        else:
+            raise ValueError("Undefined integration mode \"{}\"".format(mode))
+        if self.t >= self.endpoint:
             self.status = simulation_status["has run until the end"]
         else:
             self.status = simulation_status["has run but stopped before the end"]
-            # diagnose
-            print("Something has gone wrong with the integration")
-            self.diagnose_integration_failure(solver)
+            print(opt_out)
+        print("integration done")
 
-        time_array = np.transpose(np.array(ts))
-        conc_array = np.vstack(ys)
-
+        time_array = np.transpose(timepoints[:len(ys)])
+        print("equilibrating the results...")
+        conc_array = np.vstack([self.equilibrate(y) for y in ys])
+        print("equilibration done")
         data = np.column_stack((time_array, conc_array))
+
         labels = ["time"] + self.chems_list
         return pd.DataFrame(data=data, columns=labels)
 
