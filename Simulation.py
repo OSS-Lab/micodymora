@@ -224,7 +224,7 @@ class Simulation:
             ys, opt_out = odeint(self.f_for_odeint, self.y0, timepoints, full_output=True)
         elif mode == "by-chunk":
             solver = ode(self.f)
-            solver.set_integrator("lsoda", atol=self.atol, nsteps=5000)
+            solver.set_integrator("lsoda", atol=self.atol, nsteps=50000)
             solver.set_initial_value(self.y0)
             self.progress_tracker.set_total_time(self.endpoint)
             ts = [0]
