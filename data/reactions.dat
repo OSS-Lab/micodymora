@@ -7,3 +7,7 @@ hybrid methanogenesis: Ac(-) + 4H2(aq) + H+ --> 2CH4(aq) + 2H2O
 acetate sulfate respiration: SO4-2 + Ac(-) + H+ --> H2S(aq) + 2HCO3-
 glycerol respiration: Gly + 3.5O2(aq) --> 3CO2(g) + 4H2O
 Stahl pathway L: Lac(-) + 2H2O --> Ac(-) + 2H2(aq) + HCO3- + H+
+aerobic acetotrophy: Ac(-) + 2O2(aq) --> 2HCO3- + H+
+ammonium oxidizer: NH4+ + 1.5O2(aq) --> NO2- + H2O + 2H+
+nitrite oxidizer: NO2- + 0.5O2(aq) --> NO3-
+aerobic glucosotrophy: Glc + 6O2(aq) --> 6HCO3- + 6H+

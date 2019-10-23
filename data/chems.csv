@@ -44,6 +44,7 @@ Lac,C3H6O3,-532.9,Noor et al. 2013
 Ac(-),C2H3O2-,-367.9,Noor et al. 2013
 Ac,C2H4O2,-393.8,Noor et al. 2013
 Gly,C3H8O3,-493.5,Alberty 2003
+Glc,C6H12O6,-919.8,Kleerebezem and van Loosdrecht 2010
 Pyruvate,C3H3O3-,-474.6,Kleerebezem and van Loosdrecht 2010
 Palmitate,C16H31O2-,-259.6,Kleerebezem and van Loosdrecht 2010
 ATP,C10H12N5O13P3-4,-2771.8,Noor et al. 2013
@@ -52,3 +53,4 @@ NADH,C21H29N7O14P2,0,Guess
 NAD+,C21H28N7O14P2+,0,Guess
 Biomass(Hoover),C5H7O2N,18.8,Roden and Jin 2011
 Biomass(Heijnen),CH1.8O0.5N0.2,-67,Heijnen et al 2010
+Biomass(Battley),CH1.613O0.557N0.158,-82.16,Battley 1998

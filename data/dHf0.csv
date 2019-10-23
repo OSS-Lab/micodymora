@@ -43,6 +43,7 @@ Lac,-694.1,CRC Handbook of Chemistry and Physics
 Ac(-),-485.8,Kleerebezem et al. 2010
 Ac,unknown,none
 Gly,-676.0,Kleerebezem et al. 2010
+Glc,-1264.2,Kleerebezem et al. 2010
 Pyruvate,-596.0,Kleerebezem et al. 2010
 Palmitate,-891.4,Kleerebezem et al. 2010
 ATP,unknown,none
@@ -51,3 +52,4 @@ NADH,unknown,none
 NAD+,unknown,none
 Biomass(Hoover),unknown,none
 Biomass(Heijnen),-91.0,Kleerebezem et al. 2010
+Biomass(Battley),-126.83,Battley 1998
