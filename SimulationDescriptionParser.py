@@ -287,6 +287,8 @@ def get_simulation(input_file, logger=None, progress_tracker=None, check_uniniti
     T = input_file.get("T", T0)
     # get the dilution rate or assume it is zero
     D = input_file.get("D", 0)
+    # get fixed pH, if pH is fixed
+    fixed_pH = input_file.get("fixed pH", None)
     # determine the list of chemical species which are involved in the
     # simulation
     chems_list, nesting, equilibria, chems_dict, glt_dict, populations = outline_systems_chemistry(input_file)
@@ -294,7 +296,7 @@ def get_simulation(input_file, logger=None, progress_tracker=None, check_uniniti
 
     # instanciate the equilibrator
     chems_instances = [chems_dict[name] for name in chems_list]
-    system_equilibrator = SystemEquilibrator(chems_instances, equilibria, nesting)
+    system_equilibrator = SystemEquilibrator(chems_instances, equilibria, nesting, fixed_pH=fixed_pH)
 
     # instanciate the gas-liquid transfers
     system_glt = get_system_glt(input_file, glt_dict, chems_list)

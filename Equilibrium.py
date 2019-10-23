@@ -87,7 +87,7 @@ class WaterEquilibrium(Equilibrium):
 # take sumed concentrations vector
 # returns flat concentrations vector
 class SystemEquilibrator:
-    def __init__(self, chems, equilibria, nesting):
+    def __init__(self, chems, equilibria, nesting, fixed_pH=None):
         '''Instances of this class store all the equilibria to account for
         and apply them on aggregated concentration vectors.
 
@@ -101,6 +101,9 @@ class SystemEquilibrator:
         * nesting: a list of increasing integers indicating how species are
         aggregated in the aggregated concentration vector (see the Nesting
         module)
+
+        * fixed_pH: if defined, the pH will be fixed instead of being
+        determined dynamically
         '''
         # store the index of H+ and HO- in the aggregated vector
         H_index_in_expanded = next(i for i, chem in enumerate(chems) if chem.name == "H+")
@@ -127,6 +130,8 @@ class SystemEquilibrator:
             else:
                 trivial_equilibrium = Equilibrium([chems[nesting[i]]], [0])
                 self.equilibria.append(trivial_equilibrium)
+        if fixed_pH:
+            self.equilibrate = self.equilibrate_fixed_pH_function(fixed_pH)
 
     def charge_balance(self, H_guess, concentrations):
         '''Takes an aggregated concentration vector, computes the
@@ -158,6 +163,17 @@ class SystemEquilibrator:
         concentrations[self.H_index] = H_root
         concentrations = equilibrate_all(concentrations)
         return concentrations
+
+    def equilibrate_fixed_pH_function(self, fixed_pH):
+        fixed_H = 10**-fixed_pH
+        def equilibrate_fixed_pH(concentrations):
+            concentrations[self.H_index] = fixed_H
+            equilibrated_concentrations = list()
+            for concentration, equilibrium in zip(concentrations, self.equilibria):
+                eq_result = equilibrium.equilibrate(concentration, fixed_H)
+                equilibrated_concentrations.extend(eq_result)
+            return equilibrated_concentrations
+        return equilibrate_fixed_pH
 
 def load_equilibria_dict(chems_path, equilibria_path):
     '''Expected format of the equilibrium data file:
