@@ -97,7 +97,7 @@ class SystemEquilibrator:
             IMPORTANT: the list be be in the same order as the one given to
             the function determining the list of the chemical species involved
             in the simulation
-        
+ 
         * nesting: a list of increasing integers indicating how species are
         aggregated in the aggregated concentration vector (see the Nesting
         module)
@@ -156,7 +156,7 @@ class SystemEquilibrator:
                 eq_result = equilibrium.equilibrate(concentration, H_concentration)
                 equilibrated_concentrations.extend(eq_result)
             return equilibrated_concentrations
-        # determine the value of [H+] for which the charge balance is null, 
+        # determine the value of [H+] for which the charge balance is null,
         # while accounting for the equilibria
         H_root = brentq(self.charge_balance, 1e-14, 1, args=(concentrations,), xtol = H_tolerance)
         # set [H+] and determine the equilibrium concentrations
