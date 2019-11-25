@@ -219,7 +219,7 @@ class Simulation:
             ivp_ret = solve_ivp(self.f, (0, self.endpoint), y0, t_eval=np.asarray(sorted(timepoints)), method=method)
             print()
             print("solve_ivp message: {}".format(ivp_ret.message))
-            ys = ivp_ret.y
+            ys = ivp_ret.y.transpose()
         elif mode == "odeint":
             ys, opt_out = odeint(self.f_for_odeint, self.y0, timepoints, full_output=True)
         elif mode == "by-chunk":
