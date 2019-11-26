@@ -24,7 +24,7 @@ default_chems_description_path = os.path.join(module_path, "chems.csv")
 default_dHf0_description_path = os.path.join(module_path, "dHf0.csv")
 default_reactions_description_path = os.path.join(module_path, "reactions.dat")
 default_equilibria_description_path = os.path.join(module_path, "equilibria.dat")
-default_glt_description_path = os.path.join(module_path, "gas_liquid_transfer.dat")
+default_glt_description_path = os.path.join(module_path, "gas_liquid_transfer.csv")
 
 _population_specific_chems_pat = re.compile("\{([^}]+)\}")
 
