@@ -130,6 +130,12 @@ class SystemGasLiquidTransfers:
         for transfer in transfers:
             self.gas_outflow_vector[transfer.gas_index] = -1
 
+        # if no gas phase is defined
+        if vgas == 0:
+            zero_vector = np.zeros(len(chems_list))
+            self.get_matrix = lambda: zero_vector
+            self.get_rates = lambda C, T, tracker: zero_vector
+
     def get_matrix(self):
         gl_transfers = np.vstack([transfer.get_vector() for transfer in self.transfers]) 
         return np.vstack([gl_transfers, self.gas_outflow_vector])
