@@ -216,12 +216,12 @@ class Simulation:
         self.status = simulation_status["is running"]
         y0 = np.asarray(self.y0)
         if mode == "ivp":
-            ivp_ret = solve_ivp(self.f, (0, self.endpoint), y0, t_eval=np.asarray(sorted(timepoints)), method=method)
+            ivp_ret = solve_ivp(self.f, (0, self.endpoint), y0, t_eval=np.asarray(sorted(timepoints)), method=method, atol=self.atol)
             print()
             print("solve_ivp message: {}".format(ivp_ret.message))
             ys = ivp_ret.y.transpose()
         elif mode == "odeint":
-            ys, opt_out = odeint(self.f_for_odeint, self.y0, timepoints, full_output=True)
+            ys, opt_out = odeint(self.f_for_odeint, self.y0, timepoints, full_output=True, atol=self.atol)
         elif mode == "by-chunk":
             solver = ode(self.f)
             solver.set_integrator("lsoda", atol=self.atol, nsteps=50000)
