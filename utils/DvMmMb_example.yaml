@@ -1,0 +1,116 @@
+T: 310.15
+D: 0
+atol: 1.0e-6
+
+concentrations:
+    Lac(-): 30.0e-3
+    Ac(-): 1.0e-16
+    NH4+: 9.56e-3
+    PO4-3: 1.12e-3
+    HCO3-: 29.8e-2 #29.8e-3 # 29.8 mM from base salt mix
+    SO4-2: 7.5e-3
+    H2(g): 1.52e-3 # based on Jing's 006 data
+    H2S(g): 1.0e-9
+    CH4(g): 2.83e-4 # based on Jing's 006 data
+    CO2(g): 2.66e-3 # based on Jing's 006 data
+    N2(g): 4.52e-2 # based on Jing's 006 data
+    # Concentration of Na+ and Cl- used as a proxy to represent all charged
+    # species in the culture medium
+    #Cl-: 1.09e-1
+    #Na+: 1.77e-1 # 1.61e-1 M from base salt mix + 15 mM Na+ for NaSO4
+    Na+: 4.05e-1 # adjustment of starting pH to 7 with NaOH
+    Cl-: 1.09e-1 # adjustment of starting pH to 7 with KCl
+
+equilibria:
+    - lactate
+    - acetate
+    - carbonate
+    - phosphate
+    - ammonium
+    - hydrosulfide
+
+gas-liquid interface:
+    vliq: 5.25e-3
+    vgas: 22.15e-3
+    transfers:
+        H2: 0.133 # from estimation on JC data
+        CO2: 0.110 # from estimation on JC data
+        CH4: 0.1
+        NH3: 1.21e-1 # unknown, so its set to the mean between H2 and CO2 values
+        H2S: 0.083 # from Stahl
+
+community:
+    Dv:
+        pathways:
+            acetogenesis:
+                vmax: 1.03 # from Noguera
+                Km: {"Lac(-)": 29.0e-3}
+                dGmin: -15
+                norm: Lac(-)
+                energy barrier: -265.1
+            sulfatotrophic acetogenesis:
+                vmax: 9.42e-1 # from Noguera
+                Km: {"Lac(-)": 29.0e-3, "SO4-2": 210.0e-6}
+                dGmin: -40.0
+                norm: Lac(-)
+                energy barrier: -228.2
+            #sulfatotrophic H2 oxidation:
+            #    vmax: 3.75e-2 # from Wade
+            #    Km: {"SO4-2": 210.0e-6 , "H2(aq)": 1.4e-6}
+            #    dGmin: -12
+            #    energy barrier: -362.1
+            anabolism:
+                formula: "0.35Lac(-) + 0.2NH4+ + 0.1H+ --> {biomass} + 0.05Ac(-) + 0.4H2O"
+            decay:
+                formula: "{biomass} --> "
+        growth model:
+            name: SimpleGrowthModel
+            parameters:
+                X0: 1.84e-4
+                biomass: Biomass(Heijnen)
+                anabolism: anabolism
+                maintenance: 0
+                decay: 8.33e-4
+    Mm:
+        pathways:
+            hydrogenotrophic methanogenesis:
+                vmax: 8.49e-4 # from Robinson and Tiedje
+                Km: {"H2(aq)": 9.5e-6} # from Westermann, Ahrig and Mah 1989 (measured on Mb at 37C)
+                dGmin: -20
+                energy barrier: -876.4
+            anabolism:
+                formula: "HCO3- + 2.1H2(aq) + 0.2NH4+ + 0.8H+ --> {biomass} + 2.5H2O"
+            decay:
+                formula: "{biomass} --> "
+        growth model:
+            name: SimpleGrowthModel
+            parameters:
+                X0: 1.84e-4
+                biomass: Biomass(Heijnen)
+                anabolism: anabolism
+                maintenance: 0
+                decay: 8.33e-4
+    Mb:
+        pathways:
+            acetoclastic methanogenesis:
+                vmax: 2.68e-4 # from Westermann, Ahrig and Mah 1989
+                Km: {"Ac(-)": 4.5e-3} # from Westermann, Ahrig and Mah 1989
+                dGmin: -25
+                energy barrier: -1524
+            hydrogenotrophic methanogenesis:
+                vmax: 2.05e-3 # from Westermann, Ahrig and Mah 1989
+                Km: {"H2(aq)": 9.5e-6} # from Westermann, Ahrig and Mah 1989
+                dGmin: -20
+                energy barrier: -1059.8
+            anabolism:
+                formula: "0.525Ac(-) + 0.2NH4+ + 0.275H+ --> {biomass} + 0.05HCO3- + 0.4H2O"
+            decay:
+                formula: "{biomass} --> "
+        growth model:
+            name: SimpleGrowthModel
+            parameters:
+                X0: 1.84e-4
+                biomass: Biomass(Heijnen)
+                anabolism: anabolism
+                maintenance: 0
+                decay: 8.33e-4
