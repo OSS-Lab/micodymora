@@ -5,11 +5,11 @@ Equations (ODE) models of microbial population dynamics, while providing
 gas/liquid transfer and acide/base equilibria as additional features. It is
 compatible with Python 3.4 and onward.
 
-It contains an implementation of a simple microbial population dynamics model,
-along with some readily usable metabolic pathways and physico-chemical data
-(Henry constants, acid/base equilibrium constants, Gibbs energy and enthalpies
-of formations), plus a few convenience files to be able to run a simulation out
-of the box.
+It contains an implementation of a simple microbial population dynamics model
+(described in [this manuscript][1]), along with some
+readily usable metabolic pathways and physico-chemical data (Henry constants,
+acid/base equilibrium constants, Gibbs energy and enthalpies of formations),
+plus a few convenience files to be able to run a simulation out of the box.
 
 The way the package is organized makes it easy to add new data (reactions,
 chemical species, acide/base equilibria, thermodynamics data...), so even users
@@ -293,3 +293,5 @@ community:
   name of a gas/liquid transfer as defined in `gas_liquid_transfer.csv` and
   the value of each entry is its mass transfer coefficient (kLa) in hour-1 (cf
   Lewis and Whitman, 1924).
+
+[1]: https://biorxiv.org/cgi/content/short/857276v1
