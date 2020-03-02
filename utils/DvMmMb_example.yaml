@@ -16,8 +16,6 @@ concentrations:
     N2(g): 4.52e-2 # based on Jing's 006 data
     # Concentration of Na+ and Cl- used as a proxy to represent all charged
     # species in the culture medium
-    #Cl-: 1.09e-1
-    #Na+: 1.77e-1 # 1.61e-1 M from base salt mix + 15 mM Na+ for NaSO4
     Na+: 4.05e-1 # adjustment of starting pH to 7 with NaOH
     Cl-: 1.09e-1 # adjustment of starting pH to 7 with KCl
 
@@ -54,11 +52,11 @@ community:
                 dGmin: -40.0
                 norm: Lac(-)
                 energy barrier: -228.2
-            #sulfatotrophic H2 oxidation:
-            #    vmax: 3.75e-2 # from Wade
-            #    Km: {"SO4-2": 210.0e-6 , "H2(aq)": 1.4e-6}
-            #    dGmin: -12
-            #    energy barrier: -362.1
+            sulfatotrophic H2 oxidation:
+                vmax: 8.48e-1 # from Noguera
+                Km: {"SO4-2": 210.0e-6 , "H2(aq)": 1.4e-6}
+                dGmin: -12
+                energy barrier: -362.1
             anabolism:
                 formula: "0.35Lac(-) + 0.2NH4+ + 0.1H+ --> {biomass} + 0.05Ac(-) + 0.4H2O"
             decay:
