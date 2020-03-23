@@ -94,7 +94,7 @@ community:
                 vmax: 2.68e-4 # from Westermann, Ahrig and Mah 1989
                 Km: {"Ac(-)": 4.5e-3} # from Westermann, Ahrig and Mah 1989
                 dGmin: -25.0
-                energy barrier: -1524
+                energy barrier: -268.3
             hydrogenotrophic methanogenesis:
                 vmax: 2.05e-3 # from Westermann, Ahrig and Mah 1989
                 Km: {"H2(aq)": 9.5e-6} # from Westermann, Ahrig and Mah 1989
