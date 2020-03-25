@@ -74,7 +74,7 @@ community:
             hydrogenotrophic methanogenesis:
                 vmax: 8.49e-4 # from Robinson and Tiedje
                 Km: {"H2(aq)": 9.5e-6} # from Westermann, Ahrig and Mah 1989 (measured on Mb at 37C)
-                dGmin: -20.0
+                dGmin: -25.0
                 energy barrier: -876.4
             anabolism:
                 formula: "HCO3- + 2.1H2(aq) + 0.2NH4+ + 0.8H+ --> {biomass} + 2.5H2O"
@@ -98,7 +98,7 @@ community:
             hydrogenotrophic methanogenesis:
                 vmax: 2.05e-3 # from Westermann, Ahrig and Mah 1989
                 Km: {"H2(aq)": 9.5e-6} # from Westermann, Ahrig and Mah 1989
-                dGmin: -25.0
+                dGmin: -40.0
                 energy barrier: -1059.8
             anabolism:
                 formula: "0.525Ac(-) + 0.2NH4+ + 0.275H+ --> {biomass} + 0.05HCO3- + 0.4H2O"
